@@ -111,15 +111,7 @@
     border-radius:14px; border:1px solid rgba(255,255,255,.25);
     box-shadow:0 4px 16px rgba(0,0,0,.4); display:none;
   }
-  #zoomctl {
-    position:absolute; right:12px; bottom:96px; z-index:6; display:none;
-    flex-direction:column; gap:8px;
-  }
-  #zoomctl button {
-    width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,.2);
-    background:rgba(10,30,18,.78); color:#fff; font-size:20px; font-weight:800; cursor:pointer;
-  }
-  #zoomctl button:active { transform:scale(.92); }
+  
   #pinArrow {
     position:absolute; z-index:6; display:none; flex-direction:column; align-items:center;
     pointer-events:none; width:56px; margin-left:-28px; margin-top:-28px;
@@ -197,6 +189,7 @@
 
   #howto { text-align:left; max-width:330px; }
     #how, #levels { justify-content:flex-start; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+    .heatdot { width:22px; height:22px; border-radius:50%; display:inline-block; vertical-align:-5px; background:radial-gradient(circle at 50% 50%, rgba(6,20,12,.85) 0 4px, rgba(6,20,12,0) 5px), conic-gradient(from 210deg, #30d158, #ffd60a, #ff453a, #ff453a, #ffd60a, #30d158); box-shadow:inset 0 0 0 2px rgba(255,255,255,.55); }
     .sticky-x { position:sticky; top:10px; z-index:5; align-self:flex-end; margin:0 2px -34px 0; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.45); color:#fff; font-size:18px; }
   #howto li { margin:10px 0; font-size:15px; line-height:1.5; color:#d6e9db; list-style:none; }
   #howto li b { color:#fff; }
@@ -237,7 +230,7 @@
   </div>
   <div class="spacer">
     <div class="pill" id="hudWind" title="Wind">💨<span id="windArrow" style="display:inline-block">➤</span>&nbsp;<span id="windMph">0</span></div>
-    <button class="icon-btn" id="btnHeat" title="Read the green">⛰️</button>
+    <button class="icon-btn" id="btnHeat" title="Read the green"><span class="heatdot"></span></button>
     <button class="icon-btn" id="btnRestart" title="Restart">⟳</button>
     <button class="icon-btn" id="btnMenu" title="Menu">☰</button>
   </div>
@@ -246,11 +239,6 @@
 <div id="toast"></div>
 <div id="clubbar" class="hidden"></div>
 <canvas id="minimap" width="232" height="304"></canvas>
-<div id="zoomctl">
-  <button id="zoomIn" title="Zoom in">+</button>
-  <button id="zoomOut" title="Zoom out">−</button>
-  <button id="recenter" title="Recenter">⌂</button>
-</div>
 <div id="pinArrow"><div id="pinArrowGlyph">➤</div><div id="pinDist"></div></div>
 <div id="flash"></div>
 
@@ -260,7 +248,7 @@
   <div class="subtitle">9 fresh holes every day. Drag back, let it fly, beat par.</div>
   <div class="streak-line" id="homeStreak">🔥 Streak: 0 days</div>
   <button class="menu-btn" id="btnDaily">🗓️ Daily Challenge</button>
-  <button class="menu-btn secondary" id="btnLevels">🏌️ Solo Levels</button>
+  <button class="menu-btn secondary" id="btnLevels">🏌️ Solo Levels</button>   <button class="menu-btn secondary" id="btnRange">🎯 Driving Range</button>   <button class="menu-btn secondary" id="btnPutt">⛳ Putting Green</button>
   <button class="menu-btn secondary" id="btnHow">❓ How to play</button>
   <div class="tiny">Progress saves on this device</div>
 </div>
@@ -285,7 +273,7 @@
     <li>🕳️ Get it in the cup in as few strokes as you can. Beat par for 3 stars!</li>
     <li>🗓️ The <b>daily challenge is 9 holes</b>, same for everyone each day. Keep your streak alive.</li>
     <li>🗺️ The <b>minimap</b> (top right) shows the whole hole — follow the red arrow when the pin is off-screen.</li>
-    <li>🖐️ <b>Drag anywhere else</b> to move the camera · twist two fingers to rotate · slide two fingers up/down to tilt the view · pinch or +/− to zoom · 🏠 pauses the game.</li>
+    <li>🖐️ <b>Drag anywhere else</b> to move the camera · twist two fingers to rotate · slide two fingers up/down to tilt the view · pinch or +/− to zoom · 🏠 opens the menu — pause, restart the hole, reset the camera, or quit.</li>
   </ul>
   <button class="menu-btn secondary" id="btnHowBack">← Back</button>
 </div>
@@ -853,6 +841,17 @@ function startGame(kind, levelIdx, ds) {
     save.daily = { ds, holeIdx: 0, roundStrokes: [], roundPar: [], longestDrive: 0, done: false };
     storeSave();
     loadDailyHole(0, true);
+  } else if (kind === "range") {
+    G.holeIdx = 0; G.roundStrokes = []; G.roundPar = []; G.longestDrive = 0; G.rangeBest = 0; G.shotCarry = null;
+    const _rh = genHole(424242, 0.3, 5); _rh.waters = []; _rh.sands = [];
+    G.hole = _rh; setupHole();
+    $("hudTitle").textContent = "🎯 Driving Range";
+    toast("Driving Range — pick a club and rip it. No score, just swings.");
+  } else if (kind === "putt") {
+    G.holeIdx = 0; G.roundStrokes = []; G.roundPar = []; G.longestDrive = 0; G.puttTotal = 0; G.puttStrokes = 0; G.shotCarry = null;
+    G.hole = genHole(777001, 0.2, 3); setupHole();
+    $("hudTitle").textContent = "⛳ Putting Green";
+    toast("Putting Green — hole it, get a fresh spot. Putter only.");
   } else {
     // two-pass: first roll fixes the par, second builds a par-appropriate length
     const seed0 = 100003 + levelIdx * 7919, diff0 = levelIdx / (LEVEL_COUNT - 1);
@@ -885,13 +884,19 @@ function setupHole() {
   panX = 0; panY = 0; camDist = 1300;
   showScreen(null);
   $("hud").classList.remove("hidden");
-  $("hudPar").textContent = h.par;
-  $("hudHole").textContent = G.kind === "daily" ? (G.holeIdx + 1) + "/9" : (G.levelIdx + 1);
+  $("hudPar").textContent = (G.kind === "range" || G.kind === "putt") ? "\u2013" : h.par;
+  $("hudHole").textContent = G.kind === "daily" ? (G.holeIdx + 1) + "/9" : G.kind === "level" ? (G.levelIdx + 1) : "\u2013";
   updateStrokes(); updateDist();
-  buildClubBar();
-  setClub(recommendClub(), true);
-  refreshClubLock();
-}
+  buildClubBar(); setClub(recommendClub(), true); refreshClubLock(); if (G.kind === "putt") spotPutt(); }
+  function spotPutt() {
+    const h = G.hole, b = G.ball, a = Math.random() * TAU, r = h.greenR * (0.35 + Math.random() * 0.45);
+    b.x = h.cup.x + Math.cos(a) * r; b.y = h.cup.y + Math.sin(a) * r; b.vx = 0; b.vy = 0; b.vz = 0; b.z = 0;
+    G.lastSafe = { x: b.x, y: b.y }; G.strokes = 0; G.shotCarry = null;
+    G.state = "aim"; G.drag = null; G.done = false; G.sink = null;
+    G.cam.x = b.x; G.cam.y = b.y; panX = 0; panY = 0; camDist = 820;
+    showScreen(null); $("hud").classList.remove("hidden");
+    setClub(5, true); refreshClubLock(); updateStrokes(); updateDist();
+  }
 
 function updateStrokes() {
   if (G.kind === "daily" && G.hole) {
@@ -929,7 +934,7 @@ function shoot(dxPx, dyPx) {
   G.ball.vx = nx * speed; G.ball.vy = ny * speed;
   G.ball.vz = speed * LOFTS[G.club]; G.ball.z = 0;   // launch it!
   G.lastSafe = { x: G.ball.x, y: G.ball.y };
-  G.shotStart = { x: G.ball.x, y: G.ball.y, club: G.club, tee: Math.hypot(G.ball.x - G.hole.tee.x, G.ball.y - G.hole.tee.y) < 60 };
+  G.shotStart = { x: G.ball.x, y: G.ball.y, club: G.club, tee: Math.hypot(G.ball.x - G.hole.tee.x, G.ball.y - G.hole.tee.y) < 60 }; G.shotCarry = null;
   G.strokes++; updateStrokes();
   G.state = "roll";
   sfx.swing(G.club);
@@ -996,7 +1001,7 @@ function stepPhysics(dt) {
           toast("💧 Water! +1 stroke");
           return;
         }
-        if (b.vz < -60) {
+        if (b.vz < -60) {           if (G.shotStart && G.shotCarry == null) G.shotCarry = Math.hypot(b.x - G.shotStart.x, b.y - G.shotStart.y); // first touchdown = carry
           // bounce a few times: rollout ordered by club (driver runs, wedge checks up)
           const wedgeGreen = tLand === "green" && G.club === 4;
           const bf = wedgeGreen ? 0.12 : tLand === "green" ? 0.30 : tLand === "sand" ? 0.06 : tLand === "rough" ? 0.32 : 0.48;
@@ -1076,8 +1081,16 @@ function stepPhysics(dt) {
       return;
     }
     if (sp < 18 && !air && b.vz === 0) {
-      b.vx = 0; b.vy = 0; b.z = 0; b._sandSfx = false; noteDrive(); G.state = "aim";
+      b.vx = 0; b.vy = 0; b.z = 0; b._sandSfx = false;
+      if (G.kind === "range" && G.shotStart) {
+        const _t = Math.hypot(b.x - G.shotStart.x, b.y - G.shotStart.y);
+        const _cy = Math.round((G.shotCarry || _t) / 8), _ty = Math.round(_t / 8);
+        G.rangeBest = Math.max(G.rangeBest || 0, _ty);
+        toast(`🚀 Carry ${_cy} yd · Total ${_ty} yd — best ${G.rangeBest} yd`);
+      }
+      noteDrive(); G.state = "aim";
       setClub(recommendClub(), true); refreshClubLock();
+      if (G.kind === "range") setTimeout(() => { if (G.kind === "range" && !G.drag && G.shotStart === null && !G.done) setupHole(); }, 1400);
       return;
     }
   }
@@ -1110,7 +1123,10 @@ function scorecardHTML() {
 }
 function finishHole() {
   G.done = true;
-  const h = G.hole, st = starsFor(G.strokes, h.par);
+  const h = G.hole;
+  if (G.kind === "range") { toast("😳 HOLED IT from the range!!"); setTimeout(() => { if (G.kind === "range") setupHole(); }, 1800); return; }
+  if (G.kind === "putt") { const _n = G.strokes; G.puttTotal = (G.puttTotal || 0) + 1; G.puttStrokes = (G.puttStrokes || 0) + _n; G.done = false; toast(`⛳ Holed in ${_n}! ${G.puttTotal} sunk · ${G.puttStrokes} putts`); spotPutt(); return; }
+  const st = starsFor(G.strokes, h.par);
   const diff = G.strokes - h.par;
   const label = G.strokes === 1 ? "HOLE IN ONE!! 🏆" :
     diff <= -2 ? "Eagle! 🦅" : diff === -1 ? "Birdie! 🐥" :
@@ -1553,17 +1569,13 @@ canvas.addEventListener("pointercancel", endPointer);
 document.addEventListener("contextmenu", e => e.preventDefault());
 document.addEventListener("gesturestart", e => e.preventDefault());
 
-$("zoomIn").addEventListener("click", () => { camDist = clamp(camDist * 0.8, 450, 3800); sfx.click(); });
-$("zoomOut").addEventListener("click", () => { camDist = clamp(camDist * 1.25, 450, 3800); sfx.click(); });
-$("recenter").addEventListener("click", () => {
-  if (G.mode !== "play") return;
-  sfx.click();
-  const h = G.hole;
-  $("pauseSub").textContent = h
-    ? `${G.kind === "daily" ? "Hole " + (G.holeIdx + 1) + " of 9" : "Level " + (G.levelIdx + 1)} · Par ${h.par} · ${G.strokes} shot${G.strokes === 1 ? "" : "s"} so far`
-    : "Take a breath. The ball isn't going anywhere.";
+
+
+function openPause() {
+  if (G.mode !== "play") return;   sfx.click();   const h = G.hole;
+  $("pauseSub").textContent = h ? (G.kind === "daily" ? "Hole " + (G.holeIdx + 1) + " of 9" : G.kind === "level" ? "Level " + (G.levelIdx + 1) : G.kind === "range" ? "Driving Range" : "Putting Green") + (G.kind === "daily" || G.kind === "level" ? ` · Par ${h.par} · ${G.strokes} shot${G.strokes === 1 ? "" : "s"} so far` : G.kind === "range" && G.rangeBest ? ` · best ${G.rangeBest} yd — no score, just swings` : G.kind === "putt" && G.puttTotal ? ` · ${G.puttTotal} sunk — no score, just putts` : " — no score, just practice") : "Take a breath. The ball isn't going anywhere.";
   showScreen("pause");
-});
+}
 $("btnResume").addEventListener("click", () => { sfx.click(); showScreen(null); });
 $("btnRestartHole").addEventListener("click", () => { sfx.click(); setupHole(); });
 $("btnResetCam").addEventListener("click", () => {
@@ -1579,12 +1591,12 @@ function showScreen(name) {
   G.mode = name === null ? "play" : name;
   if (name !== null) {
     $("hud").classList.add("hidden"); $("clubbar").classList.add("hidden");
-    $("minimap").style.display = "none"; $("zoomctl").style.display = "none";
+    $("minimap").style.display = "none";
     $("pinArrow").style.display = "none";
   } else {
     $("hud").classList.remove("hidden");
     if (G.state === "aim") $("clubbar").classList.remove("hidden");
-    $("minimap").style.display = "block"; $("zoomctl").style.display = "flex";
+    $("minimap").style.display = "block";
   }
   if (name === "home") refreshHome();
   if (name === "levels") buildLevelGrid();
@@ -1620,12 +1632,14 @@ function buildLevelGrid() {
 
 $("btnDaily").addEventListener("click", () => { sfx.click(); startGame("daily", 0, dateStr(new Date())); });
 $("btnLevels").addEventListener("click", () => { sfx.click(); showScreen("levels"); });
+$("btnRange").addEventListener("click", () => { sfx.click(); startGame("range"); });
+$("btnPutt").addEventListener("click", () => { sfx.click(); startGame("putt"); });
 $("btnHow").addEventListener("click", () => { sfx.click(); showScreen("how"); });
 $("btnLevelsBack").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 $("btnHowBack").addEventListener("click", () => { sfx.click(); showScreen("home"); });
   $("btnHowX").addEventListener("click", () => { sfx.click(); showScreen("home"); });
   $("btnLevelsX").addEventListener("click", () => { sfx.click(); showScreen("home"); });
-$("btnMenu").addEventListener("click", () => { sfx.click(); showScreen("home"); });
+$("btnMenu").addEventListener("click", openPause);
 $("btnRestart").addEventListener("click", () => {
   sfx.click();
   if (G.kind === "daily") startGame("daily", 0, G.dateStr);
