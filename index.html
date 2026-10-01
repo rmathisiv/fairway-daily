@@ -81,6 +81,19 @@
     #hud #btnHeat { width:44px; height:44px; font-size:21px; }
     .club { min-width:48px; font-size:17px; }
     .club span { font-size:10px; }
+    /* action buttons move to a vertical rail on the right edge so the
+       top-left info pill gets the full row and nothing wraps */
+    #hud .spacer { gap:0; }
+    #hud .spacer .icon-btn {
+      position:fixed; right:10px; z-index:7;
+      width:44px; height:44px; font-size:18px;
+    }
+    #hud #btnHeat { top:252px; }
+    #hud #btnRestart { top:310px; }
+    #hud #btnMenu { top:368px; }
+    #hud #hudInfo { gap:12px; padding:8px 16px; }
+    #hud #hudInfo .stat { white-space:nowrap; }
+    #hud #hudInfo .stat b { font-size:15px; }
   }
 
   /* ---------- Toast ---------- */
@@ -261,7 +274,7 @@
   <h2>How to play</h2>
   <ul id="howto">
     <li>👆 <b>Drag back from the ball</b> like a slingshot, then release — the driver launches it high.</li>
-    <li>🏌️ <b>Pick your club</b> — Driver, 5/7/9 irons, Wedge, Putter. The game suggests one each shot.</li>
+    <li>🏌️ <b>Pick your club</b> — Driver (~300 yd), 5i (~200), 7i (~160), 9i (~135), Wedge (~100), Putter. The game suggests one each shot.</li>
     <li>🎯 On the green the <b>putter takes over</b>, Coffee Golf style — soft touch wins.</li>
     <li>🎯 The dotted line shows your aim — longer drag = more power.</li>
     <li>💨 Watch the wind — the dotted line flies straight, but <b>the ball drifts in the air</b>.</li>
@@ -419,10 +432,10 @@ function genHole(seed, difficulty, parHint) {
 
   // tee at origin, hole plays "up" the screen (-y)
   // hole length fits the par: par-3s are mid/short irons, par-4s driver + iron, par-5s three shots
-  const D = parHint === 3 ? 750 + rnd() * 250
-    : parHint === 4 ? 1800 + rnd() * 600
-    : parHint === 5 ? 2700 + rnd() * 600
-    : 2000 + rnd() * 1100 + diff * 1300;             // legacy range (solo levels)
+  const D = parHint === 3 ? 800 + rnd() * 320
+    : parHint === 4 ? 2720 + rnd() * 800
+    : parHint === 5 ? 4000 + rnd() * 800
+    : 3000 + rnd() * 1650 + diff * 1950;             // legacy range (solo levels)
   const segs = 4 + Math.floor(rnd() * 2 + diff * 2);     // 4..7 fairway segments
   const wander = Math.min(150 + diff * 130, D / segs * 0.8);   // doglegs stay proportional on short holes
   const pts = [{ x: 0, y: 0 }];
@@ -433,7 +446,7 @@ function genHole(seed, difficulty, parHint) {
   }
   const cup = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -320, 320), y: pts[segs].y - 50 };
   const fairR = 150 - diff * 30 + rnd() * 20;            // fairway corridor radius
-  const greenR = D < 1400 ? 150 : 220;                   // shorter holes get proportionally smaller greens
+  const greenR = D < 1600 ? 150 : 220;                   // shorter holes get proportionally smaller greens
   let islandR = 0;   // >0 on island par-3s: radius of the lake around the green
 
   // rolling hills: a few broad sine swells across the course
@@ -461,7 +474,7 @@ function genHole(seed, difficulty, parHint) {
   const tee = pts[0];
 
   // water hazards — rivers you must carry, lakes beside the hole, island par-3s; some holes stay dry
-  const par = parHint || (D < 2500 ? 3 : D < 3500 ? 4 : 5);
+  const par = parHint || (D < 3750 ? 3 : D < 5250 ? 4 : 5);
   const waters = [];
   const pathPts = pts.concat([cup]);
   function pathDist(x, y) {
@@ -477,8 +490,8 @@ function genHole(seed, difficulty, parHint) {
     // island green: one broad lake with the green rising out of it
     waters.push({ x: cup.x, y: cup.y, r: greenR + 130, island: true });
   } else if (waterKind === "river") {
-    // river: a winding band of water crossing the hole ~1150 units from the tee — must be carried
-    const target = 1150;
+    // river: a winding band of water crossing the hole ~1900 units from the tee — must be carried
+    const target = 1900;
     let acc = 0, cross = null, cdx = 0, cdy = -1;
     for (let i = 0; i < pts.length - 1 && !cross; i++) {
       const segLen = dist(pts[i], pts[i + 1]);
@@ -754,7 +767,10 @@ const G = {
 };
 
 const FRICTION = { green: 0.95, fringe: 1.6, fairway: 1.8, lightrough: 2.6, rough: 3.6, sand: 7.0, water: 0 };
-const LAND_KEEP = { green: 0.28, fringe: 0.40, fairway: 0.38, lightrough: 0.40, rough: 0.35, sand: 0.20 }; // rollout on landing
+// rollout ordered by club: driver bounds on forever, wedge checks up (index = club)
+const GREEN_KEEP = [0.62, 0.60, 0.38, 0.30, 0.18, 0.10];
+const FAIR_KEEP = [0.21, 0.15, 0.13, 0.13, 0.09, 0.10];
+const LAND_KEEP = { fringe: 0.40, lightrough: 0.40, rough: 0.35, sand: 0.20 }; // rollout on landing
 const SLOPE_G = 800;                        // downhill roll acceleration on hills
 const GREEN_SLOPE_G = 220;                  // gentler: putts bend, never arc wildly
 const SLOPE_MIN_SP = 34;                    // below this speed the ball settles instead of trickling
@@ -764,14 +780,14 @@ const LOFTS = [0.90, 0.95, 1.00, 1.08, 1.15, 0];   // driver, 5i, 7i, 9i, wedge,
 
 /* ---------- clubs ---------- */
 const CLUBS = [
-  { name: "Driver", icon: "🚀", max: 957, min: 115, drag: 170 },   // ~1500 carry
-  { name: "5 Iron", icon: "🏌️", max: 760, min: 90,  drag: 170 },   // ~1000 carry
-  { name: "7 Iron", icon: "🏌️", max: 679, min: 80,  drag: 170 },   // ~840 carry
-  { name: "9 Iron", icon: "🏌️", max: 592, min: 70,  drag: 170 },   // ~690 carry
-  { name: "Wedge",  icon: "🪶", max: 479, min: 64,  drag: 170 },   // ~480 carry
-  { name: "Putter", icon: "🎯", max: 230, min: 40,  drag: 110 },
+  { name: "Driver", icon: "🚀", max: 1230, min: 148, drag: 170 },   // ~300 yd full
+  { name: "5 Iron", icon: "🏌️", max: 980, min: 116,  drag: 170 },   // ~200 yd full
+  { name: "7 Iron", icon: "🏌️", max: 855, min: 101,  drag: 170 },   // ~160 yd full
+  { name: "9 Iron", icon: "🏌️", max: 753, min: 89,   drag: 170 },   // ~135 yd full
+  { name: "Wedge",  icon: "🪶", max: 632, min: 84,   drag: 170 },   // ~100 yd full
+  { name: "Putter", icon: "🎯", max: 230, min: 40,   drag: 110 },
 ];
-const CLUB_CARRY = [1500, 1000, 840, 690, 480];   // full-power carries, for club recommendation
+const CLUB_CARRY = [2200, 1500, 1210, 1020, 770];  // full-shot carry, world units (8 = 1 yd)   // full-power carries, for club recommendation
 G.club = 0;
 // full-power pullback distance for the active club (putter needs a shorter pull)
 function clubDragPx() { return (CLUBS[G.club] && CLUBS[G.club].drag) || MAX_DRAG_PX; }
@@ -826,13 +842,13 @@ function startGame(kind, levelIdx, ds) {
     const d = save.daily;
     if (d && d.ds === ds && d.done) { showDailyDone(d); return; }   // already played today
     if (d && d.ds === ds && !d.done && d.holeIdx > 0) {             // resume today's round
-      G.holeIdx = d.holeIdx; G.roundStrokes = d.roundStrokes.slice(); G.roundPar = d.roundPar.slice();
+      G.holeIdx = d.holeIdx; G.roundStrokes = d.roundStrokes.slice(); G.roundPar = d.roundPar.slice(); G.longestDrive = d.longestDrive || 0;
       loadDailyHole(d.holeIdx, true);
       toast("Resuming today's round — hole " + (d.holeIdx + 1) + "/9");
       return;
     }
-    G.holeIdx = 0; G.roundStrokes = []; G.roundPar = [];
-    save.daily = { ds, holeIdx: 0, roundStrokes: [], roundPar: [], done: false };
+    G.holeIdx = 0; G.roundStrokes = []; G.roundPar = []; G.longestDrive = 0;
+    save.daily = { ds, holeIdx: 0, roundStrokes: [], roundPar: [], longestDrive: 0, done: false };
     storeSave();
     loadDailyHole(0, true);
   } else {
@@ -901,7 +917,7 @@ function toast(msg, ms) {
 function shoot(dxPx, dyPx) {
   // slingshot: ball flies opposite the drag
   const len = Math.hypot(dxPx, dyPx);
-  if (len < 14) return;
+  if (len < CANCEL_PX) return;
   const power = Math.min(len, clubDragPx()) / clubDragPx();
   const speed = clubSpeed(power);
   // slingshot in screen space, rotated into world space by the camera azimuth
@@ -911,10 +927,18 @@ function shoot(dxPx, dyPx) {
   G.ball.vx = nx * speed; G.ball.vy = ny * speed;
   G.ball.vz = speed * LOFTS[G.club]; G.ball.z = 0;   // launch it!
   G.lastSafe = { x: G.ball.x, y: G.ball.y };
+  G.shotStart = { x: G.ball.x, y: G.ball.y, club: G.club, tee: Math.hypot(G.ball.x - G.hole.tee.x, G.ball.y - G.hole.tee.y) < 60 };
   G.strokes++; updateStrokes();
   G.state = "roll";
   sfx.swing(G.club);
 }
+  // longest-drive tracking (driver tee shots only)
+  function noteDrive() {
+    const s = G.shotStart; G.shotStart = null;
+    if (!s || s.club !== 0 || !s.tee) return;
+    const d = Math.hypot(G.ball.x - s.x, G.ball.y - s.y);
+    if (d > (G.longestDrive || 0)) G.longestDrive = d;
+  }
 
 /* Drop near where the ball entered the water: walk back along the incoming
    direction until we find dry land, then nudge a little further on.
@@ -961,7 +985,7 @@ function stepPhysics(dt) {
           G.strokes++; updateStrokes();
           if (!dropNearWater(h, b)) { b.x = G.lastSafe.x; b.y = G.lastSafe.y; }
           b.vx = 0; b.vy = 0; b.vz = 0;
-          G.state = "aim";
+          noteDrive(); G.state = "aim";
           setClub(recommendClub(), true); refreshClubLock();
           const fl = $("flash");
           fl.style.transition = "none"; fl.style.opacity = "0.55";
@@ -971,11 +995,11 @@ function stepPhysics(dt) {
           return;
         }
         if (b.vz < -60) {
-          // bounce a few times: lively everywhere; wedges check up but still roll out a little
+          // bounce a few times: rollout ordered by club (driver runs, wedge checks up)
           const wedgeGreen = tLand === "green" && G.club === 4;
           const bf = wedgeGreen ? 0.12 : tLand === "green" ? 0.30 : tLand === "sand" ? 0.06 : tLand === "rough" ? 0.32 : 0.48;
           b.vz = -b.vz * bf;
-          const lk = wedgeGreen ? 0.18 : (LAND_KEEP[tLand] !== undefined ? LAND_KEEP[tLand] : 0.40);
+          const lk = tLand === "green" ? GREEN_KEEP[G.club] : tLand === "fairway" ? FAIR_KEEP[G.club] : (LAND_KEEP[tLand] !== undefined ? LAND_KEEP[tLand] : 0.40);
           b.vx *= lk; b.vy *= lk;
           sfx.bounce(); spawnParticles(b.x, b.y, 5, "#fff");
         } else b.vz = 0;
@@ -1008,7 +1032,7 @@ function stepPhysics(dt) {
       G.strokes++; updateStrokes();
       if (!dropNearWater(h, b)) { b.x = G.lastSafe.x; b.y = G.lastSafe.y; }
       b.vx = 0; b.vy = 0; b.vz = 0;
-      G.state = "aim";
+      noteDrive(); G.state = "aim";
       setClub(recommendClub(), true); refreshClubLock();
       const fl = $("flash");
       fl.style.transition = "none"; fl.style.opacity = "0.55";
@@ -1043,14 +1067,14 @@ function stepPhysics(dt) {
       // out of bounds: +1 stroke, replay from the previous lie
       G.strokes++; updateStrokes();
       b.x = G.lastSafe.x; b.y = G.lastSafe.y; b.vx = 0; b.vy = 0; b.vz = 0; b.z = 0; b._sandSfx = false;
-      G.state = "aim";
+      noteDrive(); G.state = "aim";
       setClub(recommendClub(), true); refreshClubLock();
       sfx.click();
       toast("\u26D4 Out of bounds! +1 stroke");
       return;
     }
     if (sp < 18 && !air && b.vz === 0) {
-      b.vx = 0; b.vy = 0; b.z = 0; b._sandSfx = false; G.state = "aim";
+      b.vx = 0; b.vy = 0; b.z = 0; b._sandSfx = false; noteDrive(); G.state = "aim";
       setClub(recommendClub(), true); refreshClubLock();
       return;
     }
@@ -1059,6 +1083,7 @@ function stepPhysics(dt) {
 
 function holeOut() {
   const b = G.ball;
+  noteDrive();
   G.state = "holed"; b.vx = 0; b.vy = 0; b.vz = 0;
   G.sink = { t: 0, x0: b.x, y0: b.y };   // animate the ball dropping into the cup
   sfx.cupDrop();
@@ -1109,7 +1134,7 @@ function finishHole() {
   G.roundStrokes[G.holeIdx] = G.strokes;
   G.roundPar[G.holeIdx] = h.par;
   if (G.kind === "daily") {
-    save.daily = { ds: G.dateStr, holeIdx: Math.min(G.holeIdx + 1, 8), roundStrokes: G.roundStrokes.slice(), roundPar: G.roundPar.slice(), done: false };
+    save.daily = { ds: G.dateStr, holeIdx: Math.min(G.holeIdx + 1, 8), roundStrokes: G.roundStrokes.slice(), roundPar: G.roundPar.slice(), longestDrive: G.longestDrive || 0, done: false };
     storeSave();
   }
   $("ovTitle").textContent = label;
@@ -1129,7 +1154,7 @@ function finishHole() {
   save.lastDaily = ds;
   const total = roundTotal(), parTotal = roundParTotal();
   if (!save.roundBest[ds] || total < save.roundBest[ds]) save.roundBest[ds] = total;
-  save.daily = { ds, holeIdx: 8, roundStrokes: G.roundStrokes.slice(), roundPar: G.roundPar.slice(), done: true };
+  save.daily = { ds, holeIdx: 8, roundStrokes: G.roundStrokes.slice(), roundPar: G.roundPar.slice(), longestDrive: G.longestDrive || 0, done: true };
   storeSave();
   $("ovTitle").textContent = "Round complete! 🏁";
   $("ovStars").style.display = "none";
@@ -1143,7 +1168,7 @@ function finishHole() {
 }
 // already played today's daily: show the finished scorecard + share
 function showDailyDone(d) {
-  G.roundStrokes = d.roundStrokes.slice(); G.roundPar = d.roundPar.slice();
+  G.roundStrokes = d.roundStrokes.slice(); G.roundPar = d.roundPar.slice(); G.longestDrive = d.longestDrive || 0;
   const total = roundTotal(), parTotal = roundParTotal();
   $("ovTitle").textContent = "Already played today ✅";
   $("ovStars").style.display = "none";
@@ -1160,11 +1185,12 @@ function showDailyDone(d) {
 // Wordle-style result text with a link to play
 function shareText() {
   const total = roundTotal(), parTotal = roundParTotal();
+  const ld = (G.longestDrive || 0) > 0 ? `\n🏌️ Longest drive: ${Math.round(G.longestDrive / 8)} yd` : "";
   const grid = G.roundStrokes.map((s, i) => {
     const d = s - G.roundPar[i];
-    return d < 0 ? "🟩" : d === 0 ? "⬜" : "🟥";
+    return d <= -3 ? "🟪" : d === -2 ? "🟨" : d === -1 ? "🟥" : d === 0 ? "⬜" : d === 1 ? "🟦" : "⬛";
   }).join("");
-  return `⛳ Fairway Daily ${prettyDate(G.dateStr)}\nPar ${parTotal} · I shot ${total} (${fmtDiff(total - parTotal)})\n${grid}\nPlay today's round: ${GAME_URL}`;
+  return `⛳ Fairway Daily ${prettyDate(G.dateStr)}\nPar ${parTotal} · I shot ${total} (${fmtDiff(total - parTotal)})${ld}\n${grid}\nPlay today's round: ${GAME_URL}`;
 }
 async function shareResults() {
   const text = shareText();
@@ -1333,7 +1359,7 @@ function drawAim() {
   const d = G.drag;
   const dx = d.cx - d.sx, dy = d.cy - d.sy;
   const len = Math.hypot(dx, dy);
-  if (len < 14) return;
+  if (len < CANCEL_PX) return;
   const power = Math.min(len, clubDragPx()) / clubDragPx();
   const nx = -dx / len, ny = -dy / len;
   const b = G.ball;
@@ -1427,6 +1453,8 @@ function drawCupArrow() {
 }
 
 /* ---------- input (slingshot) ---------- */
+// release inside this radius of the drag start = abandoned shot, no fire
+const CANCEL_PX = 40;
 function onDown(e) {
   if (G.mode !== "play" || G.state !== "aim" || G.done) return;
   const t = e.touches ? e.touches[0] : e;
@@ -2050,7 +2078,7 @@ function buildCourse(h) {
   scene.add(courseGroup);
 }
 
-// elevation heatmap draped over the green ("read the green"): blue = low, red = high
+// elevation heatmap draped over the green ("read the green"): green = low, red = high
 function buildHeatmap(h) {
   const R = h.greenR, RINGS = 12, SEC = 64;
   const posArr = [], colArr = [], idxArr = [];
@@ -2072,7 +2100,7 @@ function buildHeatmap(h) {
   const push = (x, y, gh) => {
     posArr.push(x, gh + 3.8, y); // green surface is at groundH + 2.6; float just above it
     const t = (mx - mn) > 0.05 ? (gh - mn) / (mx - mn) : 0.5;
-    c.setHSL(0.62 - t * 0.62, 0.9, 0.45); // blue (low) -> green -> yellow -> red (high)
+    c.setHSL(0.30 - t * 0.30, 0.9, 0.42); // green (low) -> yellow -> red (high); never blue (reads as water)
     colArr.push(c.r, c.g, c.b);
     return posArr.length / 3 - 1;
   };
