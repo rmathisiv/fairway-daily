@@ -36,6 +36,20 @@
     display:flex; align-items:center; justify-content:center; pointer-events:auto;
   }
   #hud .spacer { display:flex; gap:8px; align-items:center; }
+  #hud .left-group { display:flex; gap:8px; align-items:center; }
+  /* consolidated stat bubble: hole / par / yardage / strokes in one */
+  #hud #hudInfo { font-size:15px; padding:9px 18px; gap:14px; }
+  #hud #hudInfo .stat { display:flex; flex-direction:column; align-items:center; line-height:1.25; }
+  #hud #hudInfo .stat b { font-size:16px; font-weight:700; }
+  #hud #hudInfo .stat small { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#9fd8b4; font-weight:700; }
+  /* bigger, easier-to-read wind */
+  #hud #hudWind { font-size:18px; padding:10px 18px; }
+  /* terrain / read-the-green: big and obvious */
+  #hud #btnHeat {
+    width:56px; height:56px; font-size:27px;
+    border:2px solid #7CFC9A; background:rgba(22,66,34,.9);
+    box-shadow:0 0 14px rgba(124,252,154,.45);
+  }
 
   /* ---------- Club bar ---------- */
   #clubbar {
@@ -54,10 +68,19 @@
   .club.active { background:rgba(124,252,154,.18); border-color:#7CFC9A; color:#fff; }
   .club.locked { opacity:.28; }
   @media (max-width:430px) {
+    #hud { padding:10px; }
     #hud .pill { padding:6px 10px; font-size:12px; }
-    #hud .icon-btn { width:34px; height:34px; font-size:15px; }
-    #hudTitle { display:none; }
-    .club { min-width:52px; font-size:17px; }
+    #hud .icon-btn { width:32px; height:32px; font-size:14px; }
+    #hud .spacer { gap:5px; }
+    #hud .left-group { gap:6px; }
+    #hud #hudTitle { display:none; }
+    #hud #hudInfo { gap:6px; padding:6px 10px; }
+    #hud #hudInfo .stat b { font-size:13px; }
+    #hud #hudInfo .stat small { font-size:8px; }
+    #hud #hudWind { font-size:15px; padding:7px 8px; }
+    #hud #btnHeat { width:44px; height:44px; font-size:21px; }
+    .club { min-width:48px; font-size:17px; }
+    .club span { font-size:10px; }
   }
 
   /* ---------- Toast ---------- */
@@ -165,6 +188,16 @@
 </style>
 </head>
 <body>
+<div id="pause" class="screen hidden">
+  <div class="logo">⏸️</div>
+  <h1 class="game-title">PAUSED</h1>
+  <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
+  <button class="menu-btn" id="btnResume">▶️ Resume</button>
+  <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
+  <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
+  <button class="menu-btn secondary" id="btnQuitMenu">☰ Main Menu</button>
+</div>
+
 <script>
 /* three.js r149 (MIT) - inlined for offline play */
 /**
@@ -178,13 +211,17 @@
 <canvas id="game"></canvas>
 
 <div id="hud" class="hidden">
-  <div class="pill title-pill" id="hudTitle">Daily</div>
+  <div class="left-group">
+    <div class="pill title-pill" id="hudTitle">Daily</div>
+    <div class="pill" id="hudInfo">
+      <div class="stat"><small>Hole</small><b id="hudHole">–</b></div>
+      <div class="stat"><small>Par</small><b id="hudPar">–</b></div>
+      <div class="stat"><small>To pin</small><b id="hudDist">--</b></div>
+      <div class="stat"><small>Shots</small><b id="hudStrokes">0</b></div>
+    </div>
+  </div>
   <div class="spacer">
-    <div class="pill" id="hudDist">-- yd</div>
-    <div class="pill" id="hudPar">Par 3</div>
-    <div class="pill" id="hudStrokes">0</div>
     <div class="pill" id="hudWind" title="Wind">💨<span id="windArrow" style="display:inline-block">➤</span>&nbsp;<span id="windMph">0</span></div>
-    <button class="icon-btn" id="btnSound" title="Sound">🔊</button>
     <button class="icon-btn" id="btnHeat" title="Read the green">⛰️</button>
     <button class="icon-btn" id="btnRestart" title="Restart">⟳</button>
     <button class="icon-btn" id="btnMenu" title="Menu">☰</button>
@@ -224,16 +261,16 @@
   <h2>How to play</h2>
   <ul id="howto">
     <li>👆 <b>Drag back from the ball</b> like a slingshot, then release — the driver launches it high.</li>
-    <li>🏌️ <b>Pick your club</b> — Driver off the tee, Iron and Wedge on approach. The game suggests one each shot.</li>
+    <li>🏌️ <b>Pick your club</b> — Driver, 5/7/9 irons, Wedge, Putter. The game suggests one each shot.</li>
     <li>🎯 On the green the <b>putter takes over</b>, Coffee Golf style — soft touch wins.</li>
     <li>🎯 The dotted line shows your aim — longer drag = more power.</li>
-    <li>💧 Water costs <b>+1 stroke</b> and drops you back where you shot from.</li>
+    <li>💨 Watch the wind — the dotted line flies straight, but <b>the ball drifts in the air</b>.</li>
+    <li>💧 Water costs <b>+1 stroke</b> and drops you near where it splashed.</li>
     <li>🏖️ Sand grabs the ball — plan to carry it or play short.</li>
-    <li>🧱 Walls bounce the ball — bank shots are fair game.</li>
     <li>🕳️ Get it in the cup in as few strokes as you can. Beat par for 3 stars!</li>
     <li>🗓️ The <b>daily challenge is 9 holes</b>, same for everyone each day. Keep your streak alive.</li>
     <li>🗺️ The <b>minimap</b> (top right) shows the whole hole — follow the red arrow when the pin is off-screen.</li>
-    <li>🖐️ <b>Drag anywhere else</b> to move the camera · twist two fingers to rotate · pinch or +/− to zoom · ⌂ resets the view.</li>
+    <li>🖐️ <b>Drag anywhere else</b> to move the camera · twist two fingers to rotate · slide two fingers up/down to tilt the view · pinch or +/− to zoom · 🏠 pauses the game.</li>
   </ul>
   <button class="menu-btn secondary" id="btnHowBack">← Back</button>
 </div>
@@ -349,11 +386,11 @@ const sfx = {
       noiseBurst(0.30, 900, 0.10, "bandpass", 280);
       noiseBurst(0.05, 3600, 0.13, "highpass");
       beep(150, 0.10, "sine", 0.11);
-    } else if (club === 1) {    // iron: quick whoosh + metallic click
+    } else if (club <= 3) {   // 5/7/9 iron: quick whoosh + metallic click
       noiseBurst(0.16, 1500, 0.09, "bandpass", 500);
       beep(2100, 0.06, "triangle", 0.07);
       beep(320, 0.08, "sine", 0.08);
-    } else if (club === 2) {    // wedge: soft thud
+    } else if (club === 4) {    // wedge: soft thud
       noiseBurst(0.10, 800, 0.08, "lowpass");
       beep(300, 0.09, "sine", 0.09);
     } else {                    // putter: gentle tock
@@ -365,19 +402,29 @@ const sfx = {
   splash() { beep(300, 0.25, "sawtooth", 0.07); beep(150, 0.3, "sine", 0.08, 0.05); },
   sand()   { beep(140, 0.12, "triangle", 0.06); },
   hole()   { [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, "sine", 0.10, i * 0.09)); },
+  cupDrop() {   // ball rattles into the cup: lip tick, drop, bottom thud + rattle
+    beep(820, 0.045, "triangle", 0.10);
+    beep(430, 0.07, "sine", 0.13, 0.055);
+    beep(190, 0.11, "sine", 0.14, 0.13);
+    noiseBurst(0.12, 2400, 0.05, "highpass", null, 0.14);
+  },
   click()  { beep(600, 0.06, "sine", 0.06); },
 };
 /* ---------- hole generation ---------- */
 const LEVEL_COUNT = 48;
 
-function genHole(seed, difficulty) {
+function genHole(seed, difficulty, parHint) {
   const rnd = mulberry32(seed);
   const diff = clamp(difficulty, 0, 1);
 
   // tee at origin, hole plays "up" the screen (-y)
-  const D = 2000 + rnd() * 1100 + diff * 1300;             // 2000..4400 long
+  // hole length fits the par: par-3s are mid/short irons, par-4s driver + iron, par-5s three shots
+  const D = parHint === 3 ? 750 + rnd() * 250
+    : parHint === 4 ? 1800 + rnd() * 600
+    : parHint === 5 ? 2700 + rnd() * 600
+    : 2000 + rnd() * 1100 + diff * 1300;             // legacy range (solo levels)
   const segs = 4 + Math.floor(rnd() * 2 + diff * 2);     // 4..7 fairway segments
-  const wander = 150 + diff * 130;
+  const wander = Math.min(150 + diff * 130, D / segs * 0.8);   // doglegs stay proportional on short holes
   const pts = [{ x: 0, y: 0 }];
   for (let i = 1; i <= segs; i++) {
     const prev = pts[i - 1];
@@ -386,7 +433,7 @@ function genHole(seed, difficulty) {
   }
   const cup = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -320, 320), y: pts[segs].y - 50 };
   const fairR = 150 - diff * 30 + rnd() * 20;            // fairway corridor radius
-  const greenR = 220;
+  const greenR = D < 1400 ? 150 : 220;                   // shorter holes get proportionally smaller greens
   let islandR = 0;   // >0 on island par-3s: radius of the lake around the green
 
   // rolling hills: a few broad sine swells across the course
@@ -414,7 +461,7 @@ function genHole(seed, difficulty) {
   const tee = pts[0];
 
   // water hazards — rivers you must carry, lakes beside the hole, island par-3s; some holes stay dry
-  const par = D < 2500 ? 3 : D < 3500 ? 4 : 5;
+  const par = parHint || (D < 2500 ? 3 : D < 3500 ? 4 : 5);
   const waters = [];
   const pathPts = pts.concat([cup]);
   function pathDist(x, y) {
@@ -664,6 +711,29 @@ function resize() {
 window.addEventListener("resize", resize);
 initThree(); resize();
 
+/* ---------- visible wind: drifting streaks in the air ---------- */
+const WIND_STREAKS = 70;
+let windLines = null;
+const windStreaks = [];
+function initWindStreaks() {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(WIND_STREAKS * 6), 3));
+  windLines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false,
+  }));
+  windLines.frustumCulled = false;
+  windLines.renderOrder = 5;
+  windLines.visible = false;
+  scene.add(windLines);
+  for (let i = 0; i < WIND_STREAKS; i++) {
+    windStreaks.push({
+      ox: (Math.random() - 0.5) * 1500, oy: (Math.random() - 0.5) * 1500,
+      h: 50 + (i % 6) * 55 + Math.random() * 30,
+    });
+  }
+}
+initWindStreaks();
+
 const G = {
   mode: "home",            // home | levels | how | play
   kind: null,              // 'daily' | 'level'
@@ -690,15 +760,18 @@ const GREEN_SLOPE_G = 220;                  // gentler: putts bend, never arc wi
 const SLOPE_MIN_SP = 34;                    // below this speed the ball settles instead of trickling
 const BALL_R = 10, CUP_R = 13, MAX_DRAG_PX = 170;
 const GRAV = 1100;                        // vertical gravity (world units/s^2) — floatier, more realistic hang time
-const LOFTS = [0.90, 1.00, 1.15, 0];      // driver, iron, wedge, putter launch
+const LOFTS = [0.90, 0.95, 1.00, 1.08, 1.15, 0];   // driver, 5i, 7i, 9i, wedge, putter launch
 
 /* ---------- clubs ---------- */
 const CLUBS = [
-  { name: "Driver", icon: "🚀", max: 1085, min: 128, drag: 170 },
-  { name: "Iron",   icon: "🏌️", max: 734,  min: 89,  drag: 170 },
-  { name: "Wedge",  icon: "🪶", max: 479,  min: 64,  drag: 170 },
-  { name: "Putter", icon: "🎯", max: 230,  min: 40,  drag: 110 },
+  { name: "Driver", icon: "🚀", max: 957, min: 115, drag: 170 },   // ~1500 carry
+  { name: "5 Iron", icon: "🏌️", max: 760, min: 90,  drag: 170 },   // ~1000 carry
+  { name: "7 Iron", icon: "🏌️", max: 679, min: 80,  drag: 170 },   // ~840 carry
+  { name: "9 Iron", icon: "🏌️", max: 592, min: 70,  drag: 170 },   // ~690 carry
+  { name: "Wedge",  icon: "🪶", max: 479, min: 64,  drag: 170 },   // ~480 carry
+  { name: "Putter", icon: "🎯", max: 230, min: 40,  drag: 110 },
 ];
+const CLUB_CARRY = [1500, 1000, 840, 690, 480];   // full-power carries, for club recommendation
 G.club = 0;
 // full-power pullback distance for the active club (putter needs a shorter pull)
 function clubDragPx() { return (CLUBS[G.club] && CLUBS[G.club].drag) || MAX_DRAG_PX; }
@@ -709,9 +782,10 @@ function clubSpeed(power) {
 function recommendClub() {
   const h = G.hole, b = G.ball;
   if (!h) return 0;
-  if (terrainAt(h, b.x, b.y) === "green") return 3;   // putter takes over on the green
+  if (terrainAt(h, b.x, b.y) === "green") return 5;   // putter takes over on the green
   const d = Math.hypot(b.x - h.cup.x, b.y - h.cup.y);
-  return d > 760 ? 0 : d > 400 ? 1 : d > 170 ? 2 : 3;
+  for (let i = 4; i >= 0; i--) if (CLUB_CARRY[i] >= d * 1.02) return i;   // shortest club that gets there
+  return 0;   // nothing reaches: grip it and rip it
 }
 function setClub(i, silent) {
   G.club = i;
@@ -735,7 +809,7 @@ function buildClubBar() {
 function refreshClubLock() {
   const onGreen = G.hole && terrainAt(G.hole, G.ball.x, G.ball.y) === "green";
   document.querySelectorAll("#clubbar .club").forEach(el => {
-    el.classList.toggle("locked", onGreen && +el.dataset.club !== 3);
+    el.classList.toggle("locked", onGreen && +el.dataset.club !== 5);
   });
 }
 function updateDist() {
@@ -762,7 +836,9 @@ function startGame(kind, levelIdx, ds) {
     storeSave();
     loadDailyHole(0, true);
   } else {
-    G.hole = genHole(100003 + levelIdx * 7919, levelIdx / (LEVEL_COUNT - 1));
+    // two-pass: first roll fixes the par, second builds a par-appropriate length
+    const seed0 = 100003 + levelIdx * 7919, diff0 = levelIdx / (LEVEL_COUNT - 1);
+    G.hole = genHole(seed0 + 1, diff0, genHole(seed0, diff0).par);
     setupHole();
     $("hudTitle").textContent = "Lv " + (levelIdx + 1);
     toast("Level " + (levelIdx + 1) + " — Par " + G.hole.par);
@@ -773,11 +849,11 @@ function loadDailyHole(i, first) {
   G.holeIdx = i;
   const wantPar = DAILY_PARS[i], diff = DAILY_DIFFS[i];
   let guard = 0, h;
-  do { h = genHole(hashStr("fairway" + G.dateStr + "#h" + i) + guard * 977, diff); guard++; }
+  do { h = genHole(hashStr("fairway" + G.dateStr + "#h" + i) + guard * 977, diff, wantPar); guard++; }
   while (h.par !== wantPar && guard < 80);
   G.hole = h;
   setupHole();
-  $("hudTitle").textContent = "🗓️ " + prettyDate(G.dateStr) + " · " + (i + 1) + "/9";
+  $("hudTitle").textContent = "🗓️ " + prettyDate(G.dateStr);
   toast(first ? "9 holes, same for everyone today. Good luck!" : "Hole " + (i + 1) + " — Par " + h.par);
 }
 function setupHole() {
@@ -785,12 +861,14 @@ function setupHole() {
   G.ball.x = h.tee.x; G.ball.y = h.tee.y; G.ball.vx = 0; G.ball.vy = 0; G.ball.z = 0; G.ball.vz = 0;
   G.lastSafe = { x: h.tee.x, y: h.tee.y };
   G.strokes = 0; G.state = "aim"; G.drag = null; G.particles = []; G.done = false;
+  G.sink = null;
   G.cam.x = h.tee.x; G.cam.y = h.tee.y;
   buildCourse(h);
   panX = 0; panY = 0; camDist = 1300;
   showScreen(null);
   $("hud").classList.remove("hidden");
-  $("hudPar").textContent = "Par " + h.par;
+  $("hudPar").textContent = h.par;
+  $("hudHole").textContent = G.kind === "daily" ? (G.holeIdx + 1) + "/9" : (G.levelIdx + 1);
   updateStrokes(); updateDist();
   buildClubBar();
   setClub(recommendClub(), true);
@@ -802,9 +880,9 @@ function updateStrokes() {
     let tot = G.strokes, par = G.hole.par;
     for (let i = 0; i < G.holeIdx; i++) { tot += G.roundStrokes[i]; par += G.roundPar[i]; }
     const d = tot - par;
-    $("hudStrokes").textContent = "⛳ " + G.strokes + " · " + (d === 0 ? "E" : d > 0 ? "+" + d : "" + d);
+    $("hudStrokes").textContent = "" + G.strokes + (tot > 0 ? " · " + (d === 0 ? "E" : d > 0 ? "+" + d : "" + d) : "");
   } else {
-    $("hudStrokes").textContent = "⛳ " + G.strokes;
+    $("hudStrokes").textContent = "" + G.strokes;
   }
 }
 function roundTotal() { let t = 0; for (const x of G.roundStrokes) t += x; return t; }
@@ -838,6 +916,25 @@ function shoot(dxPx, dyPx) {
   sfx.swing(G.club);
 }
 
+/* Drop near where the ball entered the water: walk back along the incoming
+   direction until we find dry land, then nudge a little further on.
+   Returns true if a drop spot was found, false to fall back to lastSafe. */
+function dropNearWater(h, b) {
+  const sp = Math.hypot(b.vx, b.vy);
+  const dx = sp > 1 ? -b.vx / sp : 0, dy = sp > 1 ? -b.vy / sp : -1;
+  let x = b.x, y = b.y;
+  for (let i = 0; i < 60; i++) {
+    x += dx * 12; y += dy * 12;
+    if (terrainAt(h, x, y) !== "water") {
+      x += dx * 24; y += dy * 24;   // nudge fully onto dry land
+      if (terrainAt(h, x, y) === "water") { x -= dx * 24; y -= dy * 24; }
+      b.x = x; b.y = y;
+      return true;
+    }
+  }
+  return false;
+}
+
 /* ---------- physics ---------- */
 function stepPhysics(dt) {
   const b = G.ball, h = G.hole;
@@ -860,9 +957,10 @@ function stepPhysics(dt) {
         b.z = 0;
         const tLand = terrainAt(h, b.x, b.y);
         if (tLand === "water") {
-          // splash! penalty + drop back (no bouncing on water)
+          // splash! +1 stroke, drop near where it entered (no replay from the last lie)
           G.strokes++; updateStrokes();
-          b.x = G.lastSafe.x; b.y = G.lastSafe.y; b.vx = 0; b.vy = 0; b.vz = 0;
+          if (!dropNearWater(h, b)) { b.x = G.lastSafe.x; b.y = G.lastSafe.y; }
+          b.vx = 0; b.vy = 0; b.vz = 0;
           G.state = "aim";
           setClub(recommendClub(), true); refreshClubLock();
           const fl = $("flash");
@@ -872,12 +970,12 @@ function stepPhysics(dt) {
           toast("💧 Water! +1 stroke");
           return;
         }
-        if (b.vz < -140) {
-          // bounce: lively on fairway, dead on sand; wedges check up hard on greens (backspin)
-          const wedgeGreen = tLand === "green" && G.club === 2;
-          const bf = wedgeGreen ? 0.06 : tLand === "green" ? 0.12 : tLand === "sand" ? 0.05 : tLand === "rough" ? 0.18 : 0.30;
+        if (b.vz < -60) {
+          // bounce a few times: lively everywhere; wedges check up but still roll out a little
+          const wedgeGreen = tLand === "green" && G.club === 4;
+          const bf = wedgeGreen ? 0.12 : tLand === "green" ? 0.30 : tLand === "sand" ? 0.06 : tLand === "rough" ? 0.32 : 0.48;
           b.vz = -b.vz * bf;
-          const lk = wedgeGreen ? 0.08 : (LAND_KEEP[tLand] !== undefined ? LAND_KEEP[tLand] : 0.40);
+          const lk = wedgeGreen ? 0.18 : (LAND_KEEP[tLand] !== undefined ? LAND_KEEP[tLand] : 0.40);
           b.vx *= lk; b.vy *= lk;
           sfx.bounce(); spawnParticles(b.x, b.y, 5, "#fff");
         } else b.vz = 0;
@@ -906,9 +1004,10 @@ function stepPhysics(dt) {
 
     const terr = terrainAt(h, b.x, b.y);
     if (!air && terr === "water") {
-      // splash! penalty + drop back
+      // splash! +1 stroke, drop near where it entered (no replay from the last lie)
       G.strokes++; updateStrokes();
-      b.x = G.lastSafe.x; b.y = G.lastSafe.y; b.vx = 0; b.vy = 0; b.vz = 0;
+      if (!dropNearWater(h, b)) { b.x = G.lastSafe.x; b.y = G.lastSafe.y; }
+      b.vx = 0; b.vy = 0; b.vz = 0;
       G.state = "aim";
       setClub(recommendClub(), true); refreshClubLock();
       const fl = $("flash");
@@ -959,10 +1058,13 @@ function stepPhysics(dt) {
 }
 
 function holeOut() {
-  G.state = "holed"; G.ball.vx = 0; G.ball.vy = 0;
-  sfx.hole();
+  const b = G.ball;
+  G.state = "holed"; b.vx = 0; b.vy = 0; b.vz = 0;
+  G.sink = { t: 0, x0: b.x, y0: b.y };   // animate the ball dropping into the cup
+  sfx.cupDrop();
+  setTimeout(() => sfx.hole(), 480);     // little celebration sting after the drop
   spawnParticles(G.hole.cup.x, G.hole.cup.y, 26, "#ffd76a");
-  setTimeout(() => { if (!G.done) finishHole(); }, 1100);
+  setTimeout(() => { if (!G.done) finishHole(); }, 1500);
 }
 
 function starsFor(strokes, par) {
@@ -1384,8 +1486,10 @@ canvas.addEventListener("pointermove", e => {
     const f = camDist / 900;
     const ca = Math.cos(camAngle), sa = Math.sin(camAngle);
     const ddx = mx - pinchPrev.mx, ddy = my - pinchPrev.my;
-    panX = clamp(panX - (ddx * ca + ddy * sa) * f * 0.9, -700, 700);
-    panY = clamp(panY - (-ddx * sa + ddy * ca) * f * 0.9, -700, 700);
+    // two fingers: horizontal slides pan, vertical slides tilt the camera (up = more head-on)
+    panX = clamp(panX - ddx * ca * f * 0.9, -700, 700);
+    panY = clamp(panY + ddx * sa * f * 0.9, -700, 700);
+    camPitch = clamp(camPitch + ddy * 0.0032, 0.35, 1.35);
     if (pinchPrev.d > 0) camDist = clamp(camDist * pinchPrev.d / Math.max(30, d), 450, 3800);
     let da = a - pinchPrev.a;
     if (da > Math.PI) da -= 2 * Math.PI;
@@ -1421,9 +1525,25 @@ document.addEventListener("gesturestart", e => e.preventDefault());
 
 $("zoomIn").addEventListener("click", () => { camDist = clamp(camDist * 0.8, 450, 3800); sfx.click(); });
 $("zoomOut").addEventListener("click", () => { camDist = clamp(camDist * 1.25, 450, 3800); sfx.click(); });
-$("recenter").addEventListener("click", () => { panX = 0; panY = 0; camDist = 1300; camAngle = 0; sfx.click(); });
+$("recenter").addEventListener("click", () => {
+  if (G.mode !== "play") return;
+  sfx.click();
+  const h = G.hole;
+  $("pauseSub").textContent = h
+    ? `${G.kind === "daily" ? "Hole " + (G.holeIdx + 1) + " of 9" : "Level " + (G.levelIdx + 1)} · Par ${h.par} · ${G.strokes} shot${G.strokes === 1 ? "" : "s"} so far`
+    : "Take a breath. The ball isn't going anywhere.";
+  showScreen("pause");
+});
+$("btnResume").addEventListener("click", () => { sfx.click(); showScreen(null); });
+$("btnRestartHole").addEventListener("click", () => { sfx.click(); setupHole(); });
+$("btnResetCam").addEventListener("click", () => {
+  sfx.click();
+  panX = 0; panY = 0; camDist = 1300; camAngle = 0; camPitch = 0.82;
+  toast("📷 Camera reset", 900);
+});
+$("btnQuitMenu").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 /* ---------- screens & UI ---------- */
-const SCREENS = ["home", "levels", "how", "overlay"];
+const SCREENS = ["home", "levels", "how", "overlay", "pause"];
 function showScreen(name) {
   for (const s of SCREENS) $(s).classList.toggle("hidden", s !== name);
   G.mode = name === null ? "play" : name;
@@ -1432,6 +1552,8 @@ function showScreen(name) {
     $("minimap").style.display = "none"; $("zoomctl").style.display = "none";
     $("pinArrow").style.display = "none";
   } else {
+    $("hud").classList.remove("hidden");
+    if (G.state === "aim") $("clubbar").classList.remove("hidden");
     $("minimap").style.display = "block"; $("zoomctl").style.display = "flex";
   }
   if (name === "home") refreshHome();
@@ -1476,11 +1598,6 @@ $("btnRestart").addEventListener("click", () => {
   sfx.click();
   if (G.kind === "daily") startGame("daily", 0, G.dateStr);
   else startGame("level", G.levelIdx);
-});
-$("btnSound").addEventListener("click", () => {
-  save.muted = !save.muted; storeSave();
-  $("btnSound").textContent = save.muted ? "🔇" : "🔊";
-  if (!save.muted) sfx.click();
 });
 $("btnHeat").addEventListener("click", () => {
   if (heatMesh) {
@@ -1536,12 +1653,11 @@ function frame(now) {
 
 /* ---------- init ---------- */
 loadSave();
-$("btnSound").textContent = save.muted ? "🔇" : "🔊";
 showScreen("home");
 requestAnimationFrame(frame); // start the loop
 
 /* ---------- 3D shot simulator (mirrors stepPhysics flight; aim stops at landing) ---------- */
-function simShot3D(sx, sy, svx, svy, svz) {
+function simShot3D(sx, sy, svx, svy, svz, ignoreWind) {
   const h = G.hole;
   let px = sx, py = sy, vx = svx, vy = svy, vz = svz, z = 0;
   const pts = [];
@@ -1549,7 +1665,7 @@ function simShot3D(sx, sy, svx, svy, svz) {
   for (let i = 0; i < 140; i++) {
     const g0 = groundH(h, px, py);
     const wasAir = z > 0 || vz !== 0;
-    if (wasAir) { vz -= GRAV * step; z += vz * step; vx += h.windAx * step; vy += h.windAy * step; }
+    if (wasAir) { vz -= GRAV * step; z += vz * step; if (!ignoreWind) { vx += h.windAx * step; vy += h.windAy * step; } }
     const air = z > 0.5;
     px += vx * step; py += vy * step;
     if (wasAir) {
@@ -1596,10 +1712,10 @@ function ballScreen() {
    world (x, y) maps to three.js (x, 0, z=y).
    ============================================================ */
 let camDist = 1300, panX = 0, panY = 0, camAngle = 0;
-const PITCH = 0.82; // camera pitch from horizontal (more horizontal view)
+let camPitch = 0.82; // camera pitch from horizontal: two fingers sliding up/down tilts it (head-on <-> top-down)
 let courseGroup = null, ballMesh = null, flagMesh = null, heatMesh = null;
 let waterMats = [];
-let aimGroup = null, aimArrow = null, aimRing = null, aimLand = null, aimDots = [];
+let aimGroup = null, aimRing = null, aimLand = null, aimDots = [];
 let bursts = [];
 const tmpV = new THREE.Vector3(), tmpC = new THREE.Color();
 
@@ -1746,8 +1862,6 @@ function ringGeo(rIn, rOut, rings, segs) {
 function initAim() {
   if (aimGroup) return;
   aimGroup = new THREE.Group();
-  aimArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 100, 0xffe9a8, 30, 18);
-  aimGroup.add(aimArrow);
   aimRing = new THREE.Mesh(new THREE.TorusGeometry(24, 3.5, 10, 40), new THREE.MeshBasicMaterial({ color: 0xffe9a8 }));
   aimRing.rotation.x = -Math.PI / 2;
   aimGroup.add(aimRing);
@@ -2033,7 +2147,7 @@ function render() {
   // camera: follow ball, user pan eases back while rolling; orbits with camAngle
   if (G.state === "roll") { panX *= 0.93; panY *= 0.93; }
   const tx = b.x + panX, tz = b.y + panY;
-  const ch = camDist * Math.cos(PITCH), cv = camDist * Math.sin(PITCH);
+  const ch = camDist * Math.cos(camPitch), cv = camDist * Math.sin(camPitch);
   camera.near = Math.max(1, camDist * 0.15); camera.far = camDist * 6 + 2000; camera.updateProjectionMatrix();
   const sa = Math.sin(camAngle), ca = Math.cos(camAngle);
   camera.position.set(tx + ch * sa, cv, tz + ch * ca);
@@ -2045,13 +2159,54 @@ function render() {
 
   // ball (flies with b.z)
   if (ballMesh) {
-    ballMesh.position.set(b.x, groundH(h, b.x, b.y) + BALL_R + (b.z || 0), b.y);
     const dt = G.frameDt || 0.016;
+    let bx = b.x, by = b.y, bs = 1;
+    let bheight = groundH(h, b.x, b.y) + BALL_R + (b.z || 0);
+    if (G.state === "holed") {
+      if (G.sink) {
+        // drop into the cup: slide to the center, rattle, then sink below the surface
+        G.sink.t += dt;
+        const t = G.sink.t, cup = h.cup;
+        const k1 = Math.min(t / 0.22, 1), e1 = 1 - (1 - k1) * (1 - k1);
+        bx = G.sink.x0 + (cup.x - G.sink.x0) * e1;
+        by = G.sink.y0 + (cup.y - G.sink.y0) * e1;
+        const k2 = Math.min(Math.max((t - 0.10) / 0.45, 0), 1), e2 = k2 * k2;
+        bheight = groundH(h, bx, by) + BALL_R - e2 * (BALL_R * 2 + 30);
+        bs = 1 - e2 * 0.45;
+        if (k2 > 0 && k2 < 1) bx += Math.sin(t * 70) * 2.5 * (1 - k2); // rattle against the cup
+      } else bs = 0.4;
+    }
+    ballMesh.position.set(bx, bheight, by);
     if (G.state === "roll") { ballMesh.rotation.x += (b.vy * dt) / BALL_R; ballMesh.rotation.z -= (b.vx * dt) / BALL_R; }
-    ballMesh.scale.setScalar(G.state === "holed" ? 0.4 : 1);
+    ballMesh.scale.setScalar(bs);
   }
   if (flagMesh) flagMesh.rotation.y = Math.sin(G.time * 3) * 0.4;
   waterMats.forEach((m, i) => { m.opacity = 0.82 + Math.sin(G.time * 2 + i * 1.7) * 0.06; });
+
+  // wind streaks: drift with the hole's wind, wrapped in a box around the ball
+  if (windLines) {
+    const mph = (h && h.windMph) || 0;
+    windLines.visible = mph > 0.4;
+    if (windLines.visible) {
+      const dtw = G.frameDt || 0.016;
+      const dx = Math.cos(h.windAng), dy = Math.sin(h.windAng);
+      const spd = 40 + mph * 26, slen = 30 + mph * 7;
+      const pos = windLines.geometry.attributes.position.array;
+      for (let i = 0; i < WIND_STREAKS; i++) {
+        const s = windStreaks[i];
+        s.ox += dx * spd * dtw; s.oy += dy * spd * dtw;
+        if (s.ox > 750) s.ox -= 1500; else if (s.ox < -750) s.ox += 1500;
+        if (s.oy > 750) s.oy -= 1500; else if (s.oy < -750) s.oy += 1500;
+        const x = b.x + s.ox, y = b.y + s.oy;
+        const z = groundH(h, x, y) + s.h;
+        const o = i * 6;
+        pos[o] = x; pos[o + 1] = z; pos[o + 2] = y;
+        pos[o + 3] = x - dx * slen; pos[o + 4] = z; pos[o + 5] = y - dy * slen;
+      }
+      windLines.geometry.attributes.position.needsUpdate = true;
+      windLines.material.opacity = Math.min(0.10 + mph * 0.022, 0.32);
+    }
+  }
 
   // aim visuals
   const dg = G.drag;
@@ -2066,17 +2221,15 @@ function render() {
       const nx = -(dx * ca + dy * sa) / len;
       const ny = (dx * sa - dy * ca) / len;
       const col = power > 0.85 ? 0xff5a5a : 0xffe9a8;
-      const bgy = groundH(h, b.x, b.y); aimArrow.position.set(b.x, bgy + 12, b.y);
-      aimArrow.setDirection(tmpV.set(nx, 0, ny));
-      aimArrow.setLength(50 + power * 300, 30, 18);
-      aimArrow.setColor(tmpC.set(col));
+      const bgy = groundH(h, b.x, b.y);
       aimRing.position.set(b.x, bgy + 5, b.y);
       const rs = 1 + power * 0.8; aimRing.scale.set(rs, rs, 1);
       aimRing.material.color.set(col);
-      const pts = simShot3D(b.x, b.y, nx * clubSpeed(power), ny * clubSpeed(power), clubSpeed(power) * LOFTS[G.club]);
+      // dotted arc ignores wind: it flies straight so the player judges drift themselves
+      const pts = simShot3D(b.x, b.y, nx * clubSpeed(power), ny * clubSpeed(power), clubSpeed(power) * LOFTS[G.club], true);
       // putts never leave the ground: draw the projection as a flat dotted line
       // at the ball's height instead of riding the terrain (no arch)
-      const puttFlat = G.club === 3;
+      const puttFlat = G.club === 5;
       let di = 0;
       for (const p of pts) {
         if (di >= aimDots.length) break;
@@ -2087,7 +2240,7 @@ function render() {
       // landing marker at the predicted landing spot (red = water/OB)
       const ep = pts[pts.length - 1];
       if (ep && aimLand) {
-        aimLand.position.set(ep.x, (G.club === 3 ? bgy : groundH(h, ep.x, ep.y)) + 6, ep.y);
+        aimLand.position.set(ep.x, (G.club === 5 ? bgy : groundH(h, ep.x, ep.y)) + 6, ep.y);
         { const lt = terrainAt(G.hole, ep.x, ep.y); aimLand.material.color.set((lt === "water" || lt === "ob") ? 0xff5a5a : 0xffffff); }
         aimLand.visible = true;
       }
