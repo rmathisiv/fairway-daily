@@ -196,6 +196,8 @@
   .row-btns .menu-btn { flex:1; padding:13px 8px; font-size:15px; }
 
   #howto { text-align:left; max-width:330px; }
+    #how, #levels { justify-content:flex-start; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+    .sticky-x { position:sticky; top:10px; z-index:5; align-self:flex-end; margin:0 2px -34px 0; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.45); color:#fff; font-size:18px; }
   #howto li { margin:10px 0; font-size:15px; line-height:1.5; color:#d6e9db; list-style:none; }
   #howto li b { color:#fff; }
 </style>
@@ -263,14 +265,14 @@
   <div class="tiny">Progress saves on this device</div>
 </div>
 
-<div id="levels" class="screen hidden">
+<div id="levels" class="screen hidden"><button class="sticky-x" id="btnLevelsX" aria-label="Close">✕</button>
   <h2>🏌️ Solo Levels</h2>
   <div class="subtitle" id="levelProgress"></div>
   <div id="levelGrid"></div>
   <button class="menu-btn secondary" id="btnLevelsBack">← Back</button>
 </div>
 
-<div id="how" class="screen hidden">
+<div id="how" class="screen hidden"><button class="sticky-x" id="btnHowX" aria-label="Close">✕</button>
   <h2>How to play</h2>
   <ul id="howto">
     <li>👆 <b>Drag back from the ball</b> like a slingshot, then release — the driver launches it high.</li>
@@ -1621,6 +1623,8 @@ $("btnLevels").addEventListener("click", () => { sfx.click(); showScreen("levels
 $("btnHow").addEventListener("click", () => { sfx.click(); showScreen("how"); });
 $("btnLevelsBack").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 $("btnHowBack").addEventListener("click", () => { sfx.click(); showScreen("home"); });
+  $("btnHowX").addEventListener("click", () => { sfx.click(); showScreen("home"); });
+  $("btnLevelsX").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 $("btnMenu").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 $("btnRestart").addEventListener("click", () => {
   sfx.click();
