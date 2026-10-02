@@ -422,9 +422,9 @@ function genHole(seed, difficulty, parHint) {
 
   // tee at origin, hole plays "up" the screen (-y)
   // hole length fits the par: par-3s are mid/short irons, par-4s driver + iron, par-5s three shots
-  const D = parHint === 3 ? 800 + rnd() * 320
-    : parHint === 4 ? 2720 + rnd() * 800
-    : parHint === 5 ? 4000 + rnd() * 800
+  const D = parHint === 3 ? 950 + rnd() * 350
+    : parHint === 4 ? 3200 + rnd() * 900
+    : parHint === 5 ? 4700 + rnd() * 900
     : 3000 + rnd() * 1650 + diff * 1950;             // legacy range (solo levels)
   const segs = 4 + Math.floor(rnd() * 2 + diff * 2);     // 4..7 fairway segments
   const wander = Math.min(150 + diff * 130, D / segs * 0.8);   // doglegs stay proportional on short holes
@@ -434,9 +434,20 @@ function genHole(seed, difficulty, parHint) {
     const nx = clamp(prev.x + (rnd() * 2 - 1) * wander, -300, 300);
     pts.push({ x: nx, y: prev.y - D / segs });
   }
-  const cup = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -320, 320), y: pts[segs].y - 50 };
   const fairR = 150 - diff * 30 + rnd() * 20;            // fairway corridor radius
-  const greenR = D < 1600 ? 165 : 240;                   // shorter holes get proportionally smaller greens
+  const greenR = D < 1600 ? 190 : 280;                   // shorter holes get proportionally smaller greens
+  // green shapes: not every green is a circle — ovals, wobbly edges, skinny/fat sides
+  const gSquash = 0.65 + rnd() * 0.35;                 // 0.65-1.0 oval squash (1 = circle)
+  const gWob = rnd() * 0.16, gWobPh = rnd() * TAU;     // 2-lobe wobble: one side fat, other skinny
+  const gWob2 = rnd() * 0.10, gWob2Ph = rnd() * TAU;   // 3-lobe wobble: irregular edge
+  // green center at the route end; the pin sits off-center on the green — never dead middle
+  const greenC = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -320, 320), y: pts[segs].y - 50 };
+  const pa = rnd() * TAU, pf = 0.15 + rnd() * 0.35;
+  const pEdge = greenR * (1 + gWob * Math.cos(2 * pa + gWobPh) + gWob2 * Math.cos(3 * pa + gWob2Ph));
+  const cup = {
+    x: clamp(greenC.x + Math.cos(pa) * pEdge * pf, -320, 320),
+    y: greenC.y + Math.sin(pa) * pEdge * pf * gSquash,
+  };
   let islandR = 0;   // >0 on island par-3s: radius of the lake around the green
 
   // rolling hills: a few broad sine swells across the course
@@ -463,10 +474,6 @@ function genHole(seed, difficulty, parHint) {
   // units: 8 = 1 yd, so 60-140 is roughly a 20-50 ft grade — real-course feel.
   const eRoll = rnd();
   const elevD = eRoll < 0.45 ? 0 : (eRoll < 0.72 ? 1 : -1) * (60 + rnd() * 80);
-  // green shapes: not every green is a circle — ovals, wobbly edges, skinny/fat sides
-  const gSquash = 0.72 + rnd() * 0.28;                 // 0.72-1.0 oval squash (1 = circle)
-  const gWob = rnd() * 0.10, gWobPh = rnd() * TAU;     // 2-lobe wobble: one side fat, other skinny
-  const gWob2 = rnd() * 0.06, gWob2Ph = rnd() * TAU;   // 3-lobe wobble: irregular edge
 
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const tee = pts[0];
@@ -486,10 +493,10 @@ function genHole(seed, difficulty, parHint) {
     : (wRoll < 0.28 ? "dry" : wRoll < 0.66 ? "river" : "lake");
   if (waterKind === "island") {
     // island green: one broad lake with the green rising out of it
-    waters.push({ x: cup.x, y: cup.y, r: greenR + 130, island: true });
+    waters.push({ x: greenC.x, y: greenC.y, r: greenR + 130, island: true });
   } else if (waterKind === "river") {
-    // river: a winding band of water crossing the hole ~1900 units from the tee — must be carried
-    const target = 1900;
+    // river: a winding band of water crossing the hole ~2200 units from the tee — must be carried
+    const target = 2200;
     let acc = 0, cross = null, cdx = 0, cdy = -1;
     for (let i = 0; i < pts.length - 1 && !cross; i++) {
       const segLen = dist(pts[i], pts[i + 1]);
@@ -500,7 +507,7 @@ function genHole(seed, difficulty, parHint) {
       }
       acc += segLen;
     }
-    if (cross && dist(cross, cup) < greenR + 240) cross = null;
+    if (cross && dist(cross, greenC) < greenR + 240) cross = null;
     if (cross) {
       const px = -cdy, py = cdx;                       // across the hole
       const r0 = 60 + rnd() * 16;
@@ -520,7 +527,7 @@ function genHole(seed, difficulty, parHint) {
     const side = rnd() < 0.5 ? -1 : 1;
     const cx = clamp(p.x + side * (fairR + 150 + rnd() * 80), -400, 400);
     const cy = clamp(p.y + (rnd() * 2 - 1) * 130, cup.y - 200, 280);
-    if (dist({ x: cx, y: cy }, tee) > 200 && dist({ x: cx, y: cy }, cup) > greenR + 130) {
+    if (dist({ x: cx, y: cy }, tee) > 200 && dist({ x: cx, y: cy }, greenC) > greenR + 130) {
       const r0 = 88 + rnd() * 30;
       const blobs = [[0, 0, 1], [0.75, 0.35, 0.8], [-0.65, 0.45, 0.78], [0.25, -0.7, 0.82], [-0.45, -0.55, 0.7]];
       for (const [ox, oy, s] of blobs)
@@ -543,7 +550,7 @@ function genHole(seed, difficulty, parHint) {
   let frontGuard = false;
   for (let i = 0; i < nSand; i++) {
     const nearGreen = rnd() < 0.45;
-    const base = nearGreen ? cup : pts[1 + Math.floor(rnd() * (segs - 1))];
+    const base = nearGreen ? greenC : pts[1 + Math.floor(rnd() * (segs - 1))];
     const s = {
       x: base.x + (rnd() * 2 - 1) * (nearGreen ? 120 : fairR),
       y: base.y + (rnd() * 2 - 1) * (nearGreen ? 120 : 130),
@@ -552,28 +559,28 @@ function genHole(seed, difficulty, parHint) {
     if (nearGreen && par >= 4 && !frontGuard) {
       // guard the front of the green on par 4/5 — approaches must land it on
       const ap = pts[segs - 1];
-      const aa = Math.atan2(cup.y - ap.y, cup.x - ap.x);
-      s.x = cup.x - Math.cos(aa) * (greenR + 85);
-      s.y = cup.y - Math.sin(aa) * (greenR + 85);
+      const aa = Math.atan2(greenC.y - ap.y, greenC.x - ap.x);
+      s.x = greenC.x - Math.cos(aa) * (greenR + 85);
+      s.y = greenC.y - Math.sin(aa) * (greenR + 85);
       frontGuard = true;
     }
-    if (dist(s, tee) < 120 || dist(s, cup) < greenR + 30) continue;
+    if (dist(s, tee) < 120 || dist(s, greenC) < greenR * 1.3) continue;
     let bad = false;
     for (const w of waters) if (Math.hypot(s.x - w.x, s.y - w.y) < w.r + 40) bad = true;
     if (!bad) sands.push(s);
   }
 
-  const minY = cup.y - 300, maxY = 240;
+  const minY = Math.min(cup.y, greenC.y) - 340, maxY = 240;
 
   // trees: solid trunks in the rough + rough texture speckles (deterministic)
-  const proto = { waters, sands, pts, fairR, cup, greenR };
+  const proto = { waters, sands, pts, fairR, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
   const trees = [];
   const nTree = 16 + Math.floor(rnd() * 10);
   for (let i = 0; i < nTree * 14 && trees.length < nTree; i++) {
     const t = { x: (rnd() * 2 - 1) * 430, y: minY + 40 + rnd() * (maxY - minY - 80), r: 20 + rnd() * 16 };
     if (terrainAt(proto, t.x, t.y) !== "rough") continue;
     if (Math.hypot(t.x - tee.x, t.y - tee.y) < 160) continue;
-    if (Math.hypot(t.x - cup.x, t.y - cup.y) < greenR + 50) continue;
+    if (Math.hypot(t.x - greenC.x, t.y - greenC.y) < greenR * 1.3) continue;
     let ok = true;
     for (const o of trees) if (Math.hypot(t.x - o.x, t.y - o.y) < 55) ok = false;
     if (ok) trees.push(t);
@@ -584,7 +591,7 @@ function genHole(seed, difficulty, parHint) {
     const t = { x: (rnd() * 2 - 1) * 440, y: minY + 30 + rnd() * (maxY - minY - 60), r: 8 + rnd() * 10 };
     if (terrainAt(proto, t.x, t.y) !== "rough") continue;
     if (Math.hypot(t.x - tee.x, t.y - tee.y) < 120) continue;
-    if (Math.hypot(t.x - cup.x, t.y - cup.y) < greenR + 40) continue;
+    if (Math.hypot(t.x - greenC.x, t.y - greenC.y) < greenR * 1.3) continue;
     let ok = true;
     for (const o of trees) if (Math.hypot(t.x - o.x, t.y - o.y) < t.r + o.r) ok = false;
     for (const o of bushes) if (Math.hypot(t.x - o.x, t.y - o.y) < 30) ok = false;
@@ -600,7 +607,7 @@ function genHole(seed, difficulty, parHint) {
   const windMph = rnd() * 20;
   const windAng = rnd() * TAU;
   const windAx = windMph * 12 * Math.cos(windAng), windAy = windMph * 12 * Math.sin(windAng);
-  return { tee, cup, pts, fairR, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
+  return { tee, cup, greenC, pts, fairR, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
 }
 
 // smoothstep helper for terrain blending
@@ -624,25 +631,25 @@ function groundH(hole, x, y) {
     z *= 0.06 + 0.94 * sstep(hole.fairR * 0.9, hole.fairR * 2.6, dF);
   }
   // calm the hills around the green complex so missed putts trickle, not rocket
-  const dgC = Math.hypot(x - hole.cup.x, y - hole.cup.y);
+  const dgC = Math.hypot(x - hole.greenC.x, y - hole.greenC.y);
   z *= 1 - 0.7 * (1 - sstep(hole.greenR + 30, hole.greenR + 230, dgC));
   // green: blend to a gentle tilt + soft bumps so putts break (follows the shaped green)
-  const _gdx = x - hole.cup.x, _gdy = (y - hole.cup.y) / (hole.gSquash || 1);
+  const _gdx = x - hole.greenC.x, _gdy = (y - hole.greenC.y) / (hole.gSquash || 1);
   const _gd = Math.hypot(_gdx, _gdy), _gEdge = greenEdge(hole, Math.atan2(_gdy, _gdx));
   if (_gd < _gEdge + 70) {
     const t = 1 - sstep(_gEdge * 0.55, _gEdge + 70, _gd);
-    let gz = ((x - hole.cup.x) * hole.greenTilt.dx + (y - hole.cup.y) * hole.greenTilt.dy) * hole.greenTilt.slope;
+    let gz = ((x - hole.greenC.x) * hole.greenTilt.dx + (y - hole.greenC.y) * hole.greenTilt.dy) * hole.greenTilt.slope;
     const gm = hole.greenMound;
-    const dm = Math.hypot(x - (hole.cup.x + gm.ox), y - (hole.cup.y + gm.oy));
+    const dm = Math.hypot(x - (hole.greenC.x + gm.ox), y - (hole.greenC.y + gm.oy));
     if (dm < gm.r) gz += gm.amp * (Math.cos(dm / gm.r * Math.PI) + 1) / 2;
     const gs = hole.greenStep;
-    const ds2 = (x - hole.cup.x) * gs.dx + (y - hole.cup.y) * gs.dy;
+    const ds2 = (x - hole.greenC.x) * gs.dx + (y - hole.greenC.y) * gs.dy;
     gz += gs.amp * (sstep(-14, 14, ds2) - 0.5);
     z = z * (1 - t) + gz * t;
   }
   // island lake bed: flatten outside the fringe so the water sits clean
   if (hole.islandR) {
-    const dI = Math.hypot(x - hole.cup.x, y - hole.cup.y);
+    const dI = Math.hypot(x - hole.greenC.x, y - hole.greenC.y);
     if (dI > hole.greenR * 1.25 && dI < hole.islandR + 60) {
       const t = (1 - sstep(hole.greenR * 1.25, hole.greenR + 95, dI)) * (1 - sstep(hole.islandR, hole.islandR + 60, dI));
       z = z * (1 - t) + (-3) * t;
@@ -673,7 +680,8 @@ function terrainAt(hole, x, y) {
     const ex = (dx * c - dy * sn) / s.rx, ey = (dx * sn + dy * c) / s.ry;
     if (ex * ex + ey * ey < 1) return "sand";
   }
-  const _tdx = x - hole.cup.x, _tdy = (y - hole.cup.y) / (hole.gSquash || 1);
+  const _gc = hole.greenC || hole.cup;
+  const _tdx = x - _gc.x, _tdy = (y - _gc.y) / (hole.gSquash || 1);
   const _td = Math.hypot(_tdx, _tdy), _te = greenEdge(hole, Math.atan2(_tdy, _tdx));
   if (_td < _te) return "green";
   if (_td < _te + 20) return "fringe";
@@ -785,14 +793,14 @@ const LOFTS = [0.90, 0.95, 1.00, 1.08, 1.15, 0];   // driver, 5i, 7i, 9i, wedge,
 
 /* ---------- clubs ---------- */
 const CLUBS = [
-  { name: "Driver", icon: "🚀", max: 1230, min: 148, drag: 170 },   // ~300 yd full
+  { name: "Driver", icon: "🚀", max: 1215, min: 148, drag: 170 },   // ~300 yd total on flat
   { name: "5 Iron", icon: "🏌️", max: 980, min: 116,  drag: 170 },   // ~200 yd full
   { name: "7 Iron", icon: "🏌️", max: 855, min: 101,  drag: 170 },   // ~160 yd full
   { name: "9 Iron", icon: "🏌️", max: 753, min: 89,   drag: 170 },   // ~135 yd full
   { name: "Wedge",  icon: "🪶", max: 632, min: 84,   drag: 170 },   // ~100 yd full
-  { name: "Putter", icon: "🎯", max: 230, min: 40,   drag: 110 },
+  { name: "Putter", icon: "🎯", max: 300, min: 50,   drag: 110 },
 ];
-const CLUB_CARRY = [2200, 1500, 1210, 1020, 770];  // full-shot carry, world units (8 = 1 yd)   // full-power carries, for club recommendation
+const CLUB_CARRY = [2160, 1500, 1210, 1020, 770];  // full-shot carry, world units (8 = 1 yd)   // full-power carries, for club recommendation
 G.club = 0;
 // full-power pullback distance for the active club (putter needs a shorter pull)
 function clubDragPx() { return (CLUBS[G.club] && CLUBS[G.club].drag) || MAX_DRAG_PX; }
@@ -803,10 +811,13 @@ function clubSpeed(power) {
 function recommendClub() {
   const h = G.hole, b = G.ball;
   if (!h) return 0;
-  if (terrainAt(h, b.x, b.y) === "green") return 5;   // putter takes over on the green
-  const d = Math.hypot(b.x - h.cup.x, b.y - h.cup.y);
-  for (let i = 4; i >= 0; i--) if (CLUB_CARRY[i] >= d * 1.02) return i;   // shortest club that gets there
-  return 0;   // nothing reaches: grip it and rip it
+  const terr = terrainAt(h, b.x, b.y);
+  if (terr === "green") return 5;   // putter takes over on the green
+  const liePen = ({ sand: 0.5, rough: 0.8, lightrough: 0.9 }[terr] || 1);
+  const d = Math.hypot(b.x - h.cup.x, b.y - h.cup.y) / liePen;   // take more club from a bad lie
+  const lo = terr === "sand" ? 1 : 0;   // no driver out of the sand
+  for (let i = 4; i >= lo; i--) if (CLUB_CARRY[i] >= d * 1.02) return i;   // shortest club that gets there
+  return lo;   // nothing reaches: grip it and rip it
 }
 function setClub(i, silent) {
   G.club = i;
@@ -828,10 +839,15 @@ function buildClubBar() {
   });
 }
 function refreshClubLock() {
-  const onGreen = G.hole && terrainAt(G.hole, G.ball.x, G.ball.y) === "green";
+  const h = G.hole; if (!h) return;
+  const terr = terrainAt(h, G.ball.x, G.ball.y);
   document.querySelectorAll("#clubbar .club").forEach(el => {
-    el.classList.toggle("locked", onGreen && +el.dataset.club !== 5);
+    const c = +el.dataset.club;
+    // putter-only on the green; no driver out of the sand
+    el.classList.toggle("locked", (terr === "green" && c !== 5) || (terr === "sand" && c === 0));
   });
+  if (terr === "sand" && G.club === 0) setClub(4, true);        // wedge out of the sand
+  else if (terr === "green" && G.club !== 5) setClub(5, true);
 }
 function updateDist() {
   if (!G.hole) return;
@@ -905,10 +921,16 @@ function setupHole() {
   updateStrokes(); updateDist();
   buildClubBar(); setClub(recommendClub(), true); refreshClubLock(); if (G.kind === "putt") spotPutt(); }
   function spotPutt() {
-    const h = G.hole, b = G.ball, a = Math.random() * TAU, f = 0.35 + Math.random() * 0.35;
-    const er = greenEdge(h, a);
-    b.x = h.cup.x + Math.cos(a) * er * f; b.y = h.cup.y + Math.sin(a) * er * f * (h.gSquash || 1);
-    b.vx = 0; b.vy = 0; b.vz = 0; b.z = 0;
+    const h = G.hole, b = G.ball;
+    let sx = h.cup.x + 120, sy = h.cup.y;   // fallback
+    for (let k = 0; k < 14; k++) {
+      const a = Math.random() * TAU, f = 0.3 + Math.random() * 0.55;
+      const er = greenEdge(h, a);
+      const x = h.greenC.x + Math.cos(a) * er * f, y = h.greenC.y + Math.sin(a) * er * f * (h.gSquash || 1);
+      const dc = Math.hypot(x - h.cup.x, y - h.cup.y);
+      if (dc > 50 && dc < er) { sx = x; sy = y; break; }
+    }
+    b.x = sx; b.y = sy; b.vx = 0; b.vy = 0; b.vz = 0; b.z = 0;
     G.lastSafe = { x: b.x, y: b.y }; G.strokes = 0; G.shotCarry = null;
     G.state = "aim"; G.drag = null; G.done = false; G.sink = null;
     G.cam.x = b.x; G.cam.y = b.y; panX = 0; panY = 0; camDist = 820; camAngle = 0; camPitch = 0.82;
@@ -944,7 +966,12 @@ function shoot(dxPx, dyPx) {
   const len = Math.hypot(dxPx, dyPx);
   if (len < CANCEL_PX) return;
   const power = Math.min(len, clubDragPx()) / clubDragPx();
-  const speed = clubSpeed(power);
+  // lie penalty: sand and rough steal distance (sand ~50%); the putter is immune
+  const _lie = terrainAt(G.hole, G.ball.x, G.ball.y);
+  const _lieDist = G.club === 5 ? 1 : ({ sand: 0.5, rough: 0.8, lightrough: 0.9 }[_lie] || 1);
+  const _liePen = Math.sqrt(_lieDist);   // distance scales ~v^2, so halve the distance = 0.71x speed
+  const speed = clubSpeed(power) * _liePen;
+  if (_liePen < 1) toast((_lie === "sand" ? "🏖️ Sand" : _lie === "rough" ? "🌾 Heavy rough" : "🌱 First cut") + " — distance cut!", 1300);
   // slingshot in screen space, rotated into world space by the camera azimuth
   const ca = Math.cos(camAngle), sa = Math.sin(camAngle);
   const nx = -(dxPx * ca + dyPx * sa) / len;
@@ -1943,15 +1970,19 @@ function greenEdge(h, a) {
 }
 // ring whose radius follows the shaped green; inner ring stays circular (cup opening),
 // squash blends in over the first rings so the cup wall never pokes through
-function shapedRingGeo(h, inFn, outFn, rings, segs) {
+function shapedRingGeo(h, inFn, outFn, rings, segs, hx, hz) {
+  // hx,hz: cup offset from the shape center (world XZ). The inner ring stays
+  // circular on the cup, blending to the shaped green by ring 2.
   const sq = h.gSquash || 1, verts = [], idx = [], uvs = [];
   const R = h.greenR;
+  hx = hx || 0; hz = hz || 0;
   for (let i = 0; i <= rings; i++) {
-    const sqMix = Math.min(i / 2, 1);
+    const ck = Math.min(i / 2, 1), sqMix = ck;
+    const ox = hx * (1 - ck), oz = hz * (1 - ck);
     for (let j = 0; j < segs; j++) {
       const a = j / segs * TAU;
       const rr = inFn(a) + (outFn(a) - inFn(a)) * i / rings;
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr * (1 + (sq - 1) * sqMix);
+      const x = ox + Math.cos(a) * rr, z = oz + Math.sin(a) * rr * (1 + (sq - 1) * sqMix);
       verts.push(x, 0, z);
       uvs.push(x / (R * 1.35) * 0.5 + 0.5, z / (R * 1.35) * 0.5 + 0.5);
     }
@@ -2079,10 +2110,11 @@ function buildCourse(h) {
   courseGroup.add(tee);
 
   // green: fringe + dense striped putting surface
-  const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.cup.x, h.cup.y), std(0x4c9a55));
+  const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.greenC.x, h.greenC.y), std(0x4c9a55));
   fringe.position.set(h.cup.x, 0.9, h.cup.y); fringe.receiveShadow = true;
   courseGroup.add(fringe);
-  const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64), h, h.cup.x, h.cup.y);
+  const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
+  const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
   shadeCavity(greenGeo, 0.86, 1.06);
   const green = new THREE.Mesh(greenGeo,
     new THREE.MeshStandardMaterial({ map: greenTexture(), roughness: 0.9, vertexColors: true }));
@@ -2173,6 +2205,7 @@ function buildCourse(h) {
 // elevation heatmap draped over the green ("read the green"): green = low, red = high
 function buildHeatmap(h) {
   const R = h.greenR, RIN = 16, RINGS = 12, SEC = 64, sq = h.gSquash || 1;
+  const hx = h.cup.x - h.greenC.x, hz = h.cup.y - h.greenC.y;
   const posArr = [], colArr = [], idxArr = [];
   const c = new THREE.Color();
   // sample green heights on a polar grid (inner ring clears the cup opening)
@@ -2182,8 +2215,10 @@ function buildHeatmap(h) {
     H[r] = [];
     for (let s = 0; s < SEC; s++) {
       const a = s / SEC * Math.PI * 2, edge = greenEdge(h, a), rad = RIN + (edge - RIN) * r / RINGS;
-      const sqMix = Math.min(r / 2, 1), sz = Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
-      const gh = groundH(h, h.cup.x + Math.cos(a) * rad, h.cup.y + sz);
+      const ck = Math.min(r / 2, 1), sqMix = ck;
+      const px = h.greenC.x + hx * (1 - ck) + Math.cos(a) * rad;
+      const py = h.greenC.y + hz * (1 - ck) + Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
+      const gh = groundH(h, px, py);
       H[r][s] = gh;
       if (gh < mn) mn = gh; if (gh > mx) mx = gh;
     }
@@ -2200,8 +2235,10 @@ function buildHeatmap(h) {
     ringStart[r] = posArr.length / 3;
     for (let s = 0; s < SEC; s++) {
       const a = s / SEC * Math.PI * 2, edge = greenEdge(h, a), rad = RIN + (edge - RIN) * r / RINGS;
-      const sqMix = Math.min(r / 2, 1), sz = Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
-      push(h.cup.x + Math.cos(a) * rad, h.cup.y + sz, H[r][s]);
+      const ck = Math.min(r / 2, 1), sqMix = ck;
+      const px = h.greenC.x + hx * (1 - ck) + Math.cos(a) * rad;
+      const py = h.greenC.y + hz * (1 - ck) + Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
+      push(px, py, H[r][s]);
     }
   }
   for (let s = 0; s < SEC; s++) {
