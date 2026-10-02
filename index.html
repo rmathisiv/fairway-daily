@@ -425,27 +425,34 @@ function genHole(seed, difficulty, parHint) {
   const D = parHint === 3 ? 950 + rnd() * 350
     : parHint === 4 ? 3200 + rnd() * 900
     : parHint === 5 ? 4700 + rnd() * 900
+    : parHint === 7 ? 6500 + rnd() * 800
     : 3000 + rnd() * 1650 + diff * 1950;             // legacy range (solo levels)
   const segs = 4 + Math.floor(rnd() * 2 + diff * 2);     // 4..7 fairway segments
   const wander = Math.min(150 + diff * 130, D / segs * 0.8);   // doglegs stay proportional on short holes
+  // dogleg: a sharp sideways kick at one middle segment (every par-4+ has one)
+  const doglegSeg = parHint >= 4 ? 1 + Math.floor(rnd() * (segs - 1)) : -1;
+  const segLen = D / segs;
+  const doglegAmt = doglegSeg > 0 ? segLen * (0.45 + rnd() * 0.35) * (rnd() < 0.5 ? -1 : 1) : 0;
   const pts = [{ x: 0, y: 0 }];
   for (let i = 1; i <= segs; i++) {
     const prev = pts[i - 1];
-    const nx = clamp(prev.x + (rnd() * 2 - 1) * wander, -300, 300);
+    let nx = clamp(prev.x + (rnd() * 2 - 1) * wander, -320, 320);
+    if (i === doglegSeg) nx = clamp(nx + doglegAmt, -320, 320);   // the elbow
+    else if (i > doglegSeg && doglegSeg > 0) nx = clamp(prev.x + (rnd() * 2 - 1) * wander * 0.5, -320, 320);
     pts.push({ x: nx, y: prev.y - D / segs });
   }
-  const fairR = 150 - diff * 30 + rnd() * 20;            // fairway corridor radius
+  const fairR = 200 - diff * 30 + rnd() * 20;            // fairway corridor radius (wider)
   const greenR = D < 1600 ? 190 : 280;                   // shorter holes get proportionally smaller greens
   // green shapes: not every green is a circle — ovals, wobbly edges, skinny/fat sides
   const gSquash = 0.65 + rnd() * 0.35;                 // 0.65-1.0 oval squash (1 = circle)
   const gWob = rnd() * 0.16, gWobPh = rnd() * TAU;     // 2-lobe wobble: one side fat, other skinny
   const gWob2 = rnd() * 0.10, gWob2Ph = rnd() * TAU;   // 3-lobe wobble: irregular edge
   // green center at the route end; the pin sits off-center on the green — never dead middle
-  const greenC = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -320, 320), y: pts[segs].y - 50 };
+  const greenC = { x: clamp(pts[segs].x + (rnd() * 2 - 1) * 60, -420, 420), y: pts[segs].y - 50 };
   const pa = rnd() * TAU, pf = 0.15 + rnd() * 0.35;
   const pEdge = greenR * (1 + gWob * Math.cos(2 * pa + gWobPh) + gWob2 * Math.cos(3 * pa + gWob2Ph));
   const cup = {
-    x: clamp(greenC.x + Math.cos(pa) * pEdge * pf, -320, 320),
+    x: clamp(greenC.x + Math.cos(pa) * pEdge * pf, -420, 420),
     y: greenC.y + Math.sin(pa) * pEdge * pf * gSquash,
   };
   let islandR = 0;   // >0 on island par-3s: radius of the lake around the green
@@ -855,8 +862,8 @@ function updateDist() {
   $("hudDist").textContent = Math.max(1, Math.round(d / 8)) + " yd";
 }
 
-const DAILY_PARS = [4, 5, 3, 4, 4, 3, 5, 4, 4];          // daily scorecard, par 36
-const DAILY_DIFFS = [0.45, 0.85, 0.05, 0.45, 0.55, 0.05, 0.85, 0.45, 0.55];
+const DAILY_PARS = [4, 5, 3, 7, 4, 3, 5, 4, 4];          // daily scorecard, par 39 (par 7 + 2x3 + 2x5 + 4x4)
+const DAILY_DIFFS = [0.45, 0.70, 0.10, 0.90, 0.50, 0.15, 0.75, 0.45, 0.55];
 const DAILY_TEST_UNLIMITED = true;   // TEMP testing: replay the daily as much as you want
 function startGame(kind, levelIdx, ds) {
   G.kind = kind; G.levelIdx = levelIdx; G.dateStr = ds;
@@ -2004,7 +2011,7 @@ function initAim() {
   aimRing.rotation.x = -Math.PI / 2;
   aimGroup.add(aimRing);
   for (let i = 0; i < 26; i++) {
-    const d = new THREE.Mesh(new THREE.SphereGeometry(4.5, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const d = new THREE.Mesh(new THREE.SphereGeometry(2.8, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
     d.visible = false; aimDots.push(d); aimGroup.add(d);
   }
   // landing marker: ring where the sim predicts the ball will land
@@ -2110,7 +2117,7 @@ function buildCourse(h) {
   courseGroup.add(tee);
 
   // green: fringe + dense striped putting surface
-  const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.greenC.x, h.greenC.y), std(0x4c9a55));
+  const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.greenC.x, h.greenC.y), new THREE.MeshStandardMaterial({ color: 0x2e5a34, roughness: 1 }));
   fringe.position.set(h.cup.x, 0.9, h.cup.y); fringe.receiveShadow = true;
   courseGroup.add(fringe);
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
