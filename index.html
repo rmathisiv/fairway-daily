@@ -200,7 +200,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 9</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 10</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -481,7 +481,7 @@ function genHole(seed, difficulty, parHint) {
   // hole elevation: some holes play uphill/downhill tee-to-green (0 = flat).
   // units: 8 = 1 yd, so 60-140 is roughly a 20-50 ft grade — real-course feel.
   const eRoll = rnd();
-  const elevD = eRoll < 0.45 ? 0 : (eRoll < 0.72 ? 1 : -1) * (60 + rnd() * 80);
+  const elevD = eRoll < 0.30 ? 0 : (eRoll < 0.65 ? 1 : -1) * (150 + rnd() * 150);
 
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const tee = pts[0];
@@ -2123,9 +2123,21 @@ function buildCourse(h) {
   courseGroup.add(fringe);
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
   const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
+  // feather the green's edge into the terrain: inner rings sit at full 2.6 lift,
+  // outer rings ramp down so there's no visible "plate" lip at the boundary
+  {
+    const p = greenGeo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const ring = Math.floor(i / 64); // 0..12
+      const lift = ring <= 9 ? 2.6 : ring === 10 ? 1.7 : ring === 11 ? 0.8 : 0.3;
+      p.setY(i, p.getY(i) + lift);
+    }
+    p.needsUpdate = true;
+    greenGeo.computeVertexNormals();
+  }
   const green = new THREE.Mesh(greenGeo,
     new THREE.MeshStandardMaterial({ map: greenTexture(), roughness: 1, color: 0x4a6a4a }));
-  green.position.set(h.greenC.x, 2.6, h.greenC.y); green.receiveShadow = true;
+  green.position.set(h.greenC.x, 0, h.greenC.y); green.receiveShadow = true;
   courseGroup.add(green);
 
   // sand (ellipses)
