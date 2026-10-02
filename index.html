@@ -1748,7 +1748,7 @@ showScreen("home");
 requestAnimationFrame(frame); // start the loop
 
 /* ---------- 3D shot simulator (mirrors stepPhysics flight; aim stops at landing) ---------- */
-function simShot3D(sx, sy, svx, svy, svz, ignoreWind) {
+function simShot3D(sx, sy, svx, svy, svz, ignoreWind, ignoreSlope) {
   const h = G.hole;
   let px = sx, py = sy, vx = svx, vy = svy, vz = svz, z = 0;
   const pts = [];
@@ -1778,7 +1778,7 @@ function simShot3D(sx, sy, svx, svy, svz, ignoreWind) {
     if (z === 0 && vz === 0 && (terr === "water" || terr === "ob")) { pts.push({ x: px, y: py, z: 0 }); break; } // rolled into the drink/OB
     const damp = Math.exp(-(air ? 0.12 : (FRICTION[terr] || FRICTION.rough)) * step);
     vx *= damp; vy *= damp;
-    if (!air && Math.hypot(vx, vy) > SLOPE_MIN_SP) {
+    if (!air && !ignoreSlope && Math.hypot(vx, vy) > SLOPE_MIN_SP) {
       const e = 7;
       const gx = (groundH(h, px + e, py) - groundH(h, px - e, py)) / (2 * e);
       const gy = (groundH(h, px, py + e) - groundH(h, px, py - e)) / (2 * e);
@@ -1833,7 +1833,7 @@ function stripeTexture(base) {
 function greenTexture() {
   const c = document.createElement("canvas"); c.width = c.height = 256;
   const g = c.getContext("2d");
-  g.fillStyle = "#63c76f"; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = "#4da95c"; g.fillRect(0, 0, 256, 256);
   g.fillStyle = "rgba(255,255,255,.10)";
   for (let y = 0; y < 256; y += 32) g.fillRect(0, y, 256, 16);
   for (let i = 0; i < 2600; i++) {
@@ -1977,7 +1977,7 @@ function shapedRingGeo(h, inFn, outFn, rings, segs, hx, hz) {
   const R = h.greenR;
   hx = hx || 0; hz = hz || 0;
   for (let i = 0; i <= rings; i++) {
-    const ck = Math.min(i / 2, 1), sqMix = ck;
+    const ck = i / rings, sqMix = ck;   // blend cup->center over ALL rings (keeps rings nested, no folding)
     const ox = hx * (1 - ck), oz = hz * (1 - ck);
     for (let j = 0; j < segs; j++) {
       const a = j / segs * TAU;
@@ -2115,9 +2115,8 @@ function buildCourse(h) {
   courseGroup.add(fringe);
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
   const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
-  shadeCavity(greenGeo, 0.86, 1.06);
   const green = new THREE.Mesh(greenGeo,
-    new THREE.MeshStandardMaterial({ map: greenTexture(), roughness: 0.9, vertexColors: true }));
+    new THREE.MeshStandardMaterial({ map: greenTexture(), roughness: 1, color: 0x4a6a4a }));
   green.position.set(h.cup.x, 2.6, h.cup.y); green.receiveShadow = true;
   courseGroup.add(green);
 
@@ -2215,7 +2214,7 @@ function buildHeatmap(h) {
     H[r] = [];
     for (let s = 0; s < SEC; s++) {
       const a = s / SEC * Math.PI * 2, edge = greenEdge(h, a), rad = RIN + (edge - RIN) * r / RINGS;
-      const ck = Math.min(r / 2, 1), sqMix = ck;
+      const ck = r / RINGS, sqMix = ck;   // full blend keeps rings nested
       const px = h.greenC.x + hx * (1 - ck) + Math.cos(a) * rad;
       const py = h.greenC.y + hz * (1 - ck) + Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
       const gh = groundH(h, px, py);
@@ -2235,7 +2234,7 @@ function buildHeatmap(h) {
     ringStart[r] = posArr.length / 3;
     for (let s = 0; s < SEC; s++) {
       const a = s / SEC * Math.PI * 2, edge = greenEdge(h, a), rad = RIN + (edge - RIN) * r / RINGS;
-      const ck = Math.min(r / 2, 1), sqMix = ck;
+      const ck = r / RINGS, sqMix = ck;   // full blend keeps rings nested
       const px = h.greenC.x + hx * (1 - ck) + Math.cos(a) * rad;
       const py = h.greenC.y + hz * (1 - ck) + Math.sin(a) * rad * (1 + (sq - 1) * sqMix);
       push(px, py, H[r][s]);
@@ -2380,8 +2379,9 @@ function render() {
       aimRing.position.set(b.x, bgy + 5, b.y);
       const rs = 1 + power * 0.8; aimRing.scale.set(rs, rs, 1);
       aimRing.material.color.set(col);
-      // dotted arc ignores wind: it flies straight so the player judges drift themselves
-      const pts = simShot3D(b.x, b.y, nx * clubSpeed(power), ny * clubSpeed(power), clubSpeed(power) * LOFTS[G.club], true);
+      // dotted arc ignores wind and (for putts) slope: it flies straight so the
+      // player judges drift and break themselves
+      const pts = simShot3D(b.x, b.y, nx * clubSpeed(power), ny * clubSpeed(power), clubSpeed(power) * LOFTS[G.club], true, G.club === 5);
       // putts never leave the ground: draw the projection as a flat dotted line
       // at the ball's height instead of riding the terrain (no arch)
       const puttFlat = G.club === 5;
