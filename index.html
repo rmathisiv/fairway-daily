@@ -2119,13 +2119,13 @@ function buildCourse(h) {
 
   // green: fringe + dense striped putting surface
   const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.greenC.x, h.greenC.y), new THREE.MeshStandardMaterial({ color: 0x2e5a34, roughness: 1 }));
-  fringe.position.set(h.cup.x, 0.9, h.cup.y); fringe.receiveShadow = true;
+  fringe.position.set(h.greenC.x, 0.9, h.greenC.y); fringe.receiveShadow = true;
   courseGroup.add(fringe);
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
   const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
   const green = new THREE.Mesh(greenGeo,
     new THREE.MeshStandardMaterial({ map: greenTexture(), roughness: 1, color: 0x4a6a4a }));
-  green.position.set(h.cup.x, 2.6, h.cup.y); green.receiveShadow = true;
+  green.position.set(h.greenC.x, 2.6, h.greenC.y); green.receiveShadow = true;
   courseGroup.add(green);
 
   // sand (ellipses)
