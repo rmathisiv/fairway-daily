@@ -200,7 +200,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 10</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 11</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -2118,9 +2118,7 @@ function buildCourse(h) {
   courseGroup.add(tee);
 
   // green: fringe + dense striped putting surface
-  const fringe = new THREE.Mesh(drapeAdd(shapedRingGeo(h, (a) => greenEdge(h, a) - 6, (a) => greenEdge(h, a) + 20, 4, 64), h, h.greenC.x, h.greenC.y), new THREE.MeshStandardMaterial({ color: 0x2e5a34, roughness: 1 }));
-  fringe.position.set(h.greenC.x, 0.9, h.greenC.y); fringe.receiveShadow = true;
-  courseGroup.add(fringe);
+  // (fringe removed: the green's feathered edge blends directly into the terrain)
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
   const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
   // feather the green's edge into the terrain: inner rings sit at full 2.6 lift,
