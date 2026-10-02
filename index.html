@@ -205,7 +205,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 15</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 16</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -978,7 +978,7 @@ function shoot(dxPx, dyPx) {
   // slingshot: ball flies opposite the drag
   const len = Math.hypot(dxPx, dyPx);
   if (len < CANCEL_PX) return;
-  const power = Math.min(len, clubDragPx()) / clubDragPx();
+  const power = touchyPower(len);
   // lie penalty: sand and rough steal distance (sand ~50%); the putter is immune
   const _lie = terrainAt(G.hole, G.ball.x, G.ball.y);
   const _lieDist = G.club === 5 ? 1 : ({ sand: 0.5, rough: 0.8, lightrough: 0.9 }[_lie] || 1);
@@ -1436,7 +1436,7 @@ function drawAim() {
   const dx = d.cx - d.sx, dy = d.cy - d.sy;
   const len = Math.hypot(dx, dy);
   if (len < CANCEL_PX) return;
-  const power = Math.min(len, clubDragPx()) / clubDragPx();
+  const power = touchyPower(len);
   let nx = -dx / len, ny = -dy / len;
   // apply aim wobble (grows the longer you hold)
   const wob = aimWobble();
@@ -1605,6 +1605,12 @@ function aimWobble() {
   const hold = (performance.now() - d.t0) / 1000; // seconds
   const amp = Math.min(hold / 3, 1) * 0.05; // 0 to ~3 degrees
   return amp * Math.sin(hold * 3.5 + d.wobPhase);
+}
+// touchy power: exponential curve — fine control at low power, very sensitive at the top end.
+// 50% drag ≈ 33% power, 80% ≈ 57%, 90% ≈ 77%, 100% = 100%.
+function touchyPower(len) {
+  const raw = Math.min(len, clubDragPx()) / clubDragPx();
+  return Math.pow(raw, 1.6);
 }
 function onMove(e) {
   if (!G.drag) return;
@@ -2467,7 +2473,7 @@ function render() {
   if (aiming) {
     const dx = dg.cx - dg.sx, dy = dg.cy - dg.sy, len = Math.hypot(dx, dy);
     if (len >= 14) {
-      const power = Math.min(len, clubDragPx()) / clubDragPx();
+      const power = touchyPower(len);
       // screen-space drag rotated into world space by the camera azimuth
       const ca = Math.cos(camAngle), sa = Math.sin(camAngle);
       const nx = -(dx * ca + dy * sa) / len;
