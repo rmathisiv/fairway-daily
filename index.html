@@ -205,7 +205,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 14</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 15</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -1437,7 +1437,10 @@ function drawAim() {
   const len = Math.hypot(dx, dy);
   if (len < CANCEL_PX) return;
   const power = Math.min(len, clubDragPx()) / clubDragPx();
-  const nx = -dx / len, ny = -dy / len;
+  let nx = -dx / len, ny = -dy / len;
+  // apply aim wobble (grows the longer you hold)
+  const wob = aimWobble();
+  if (wob) { const cw = Math.cos(wob), sw = Math.sin(wob); const tx = nx; nx = tx * cw - ny * sw; ny = tx * sw + ny * cw; }
   const b = G.ball;
   const aimLen = 60 + power * 300;
 
@@ -1592,8 +1595,16 @@ const CANCEL_PX = 40;
 function onDown(e) {
   if (G.mode !== "play" || G.state !== "aim" || G.done) return;
   const t = e.touches ? e.touches[0] : e;
-  G.drag = { sx: t.clientX, sy: t.clientY, cx: t.clientX, cy: t.clientY, id: t.identifier };
+  G.drag = { sx: t.clientX, sy: t.clientY, cx: t.clientX, cy: t.clientY, id: t.identifier, t0: performance.now(), wobPhase: Math.random() * Math.PI * 2 };
   e.preventDefault();
+}
+// aim wobble: the longer you hold the drag, the more the aim drifts (up to ~3° after 3s).
+// quick, decisive aims stay true; overthinking makes it wander.
+function aimWobble() {
+  const d = G.drag; if (!d || !d.t0) return 0;
+  const hold = (performance.now() - d.t0) / 1000; // seconds
+  const amp = Math.min(hold / 3, 1) * 0.05; // 0 to ~3 degrees
+  return amp * Math.sin(hold * 3.5 + d.wobPhase);
 }
 function onMove(e) {
   if (!G.drag) return;
@@ -1604,8 +1615,13 @@ function onMove(e) {
 }
 function onUp(e) {
   if (!G.drag) return;
-  const d = G.drag; G.drag = null;
-  shoot(d.cx - d.sx, d.cy - d.sy);
+  const d = G.drag;
+  // apply the same aim wobble the player saw in the preview
+  const wob = aimWobble();
+  let rdx = d.cx - d.sx, rdy = d.cy - d.sy;
+  if (wob) { const cw = Math.cos(wob), sw = Math.sin(wob); const tx = rdx; rdx = tx * cw - rdy * sw; rdy = tx * sw + rdy * cw; }
+  G.drag = null;
+  shoot(rdx, rdy);
   e.preventDefault();
 }
 /* ---------- input: drag BALL = shoot, drag elsewhere = pan, 2 fingers = pan+zoom ---------- */
@@ -1626,7 +1642,7 @@ canvas.addEventListener("pointerdown", e => {
       if (G.state === "aim") {
         const bs = ballScreen();
         if (Math.hypot(e.clientX - bs.x, e.clientY - bs.y) < 80) {
-          G.drag = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY };
+          G.drag = { sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, t0: performance.now(), wobPhase: Math.random() * Math.PI * 2 };
         } else {
           G.panDrag = { x: e.clientX, y: e.clientY };
         }
