@@ -189,18 +189,23 @@
 
   #howto { text-align:left; max-width:330px; }
     #how, #levels { justify-content:flex-start; overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
-    .heatdot { width:22px; height:22px; border-radius:50%; display:inline-block; vertical-align:-5px; background:radial-gradient(circle at 50% 50%, rgba(6,20,12,.85) 0 4px, rgba(6,20,12,0) 5px), conic-gradient(from 210deg, #30d158, #ffd60a, #ff453a, #ff453a, #ffd60a, #30d158); box-shadow:inset 0 0 0 2px rgba(255,255,255,.55); }
+    .heatdot { width:26px; height:20px; border-radius:50%; display:inline-block; vertical-align:-3px; background:radial-gradient(ellipse at 50% 60%, #3ddc68 0%, #28a745 70%, #1e7a34 100%); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35), 0 0 0 2px #ff9f0a, 0 0 8px rgba(255,159,10,.6); position:relative; }
+    .heatdot::after { content:"⛳"; position:absolute; left:50%; top:50%; transform:translate(-50%,-58%); font-size:14px; }
     .sticky-x { position:sticky; top:10px; z-index:5; align-self:flex-end; margin:0 2px -34px 0; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.45); color:#fff; font-size:18px; }
   #howto li { margin:10px 0; font-size:15px; line-height:1.5; color:#d6e9db; list-style:none; }
   #howto li b { color:#fff; }
 </style>
 </head>
 <body>
+<div id="mapExpand" class="hidden" style="position:fixed;inset:0;background:rgba(4,12,8,.92);z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+  <canvas id="mapCanvas" style="width:min(92vw,420px);height:min(70vh,560px);border-radius:12px;"></canvas>
+  <button id="mapClose" style="margin-top:14px;padding:10px 28px;border-radius:20px;border:1px solid #7CFC9A;background:#16422a;color:#fff;font-size:16px;">Close</button>
+</div>
 <div id="pause" class="screen hidden">
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 12</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 13</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -1523,6 +1528,64 @@ function drawCupArrow() {
   ctx.restore();
 }
 
+/* ---------- expandable minimap ---------- */
+function drawExpandedMap() {
+  const h = G.hole; if (!h) return;
+  const cv = document.getElementById("mapCanvas");
+  const g = cv.getContext("2d");
+  const W = cv.width = 420, H = cv.height = 560;
+  const minX = -520, maxX = 520, minY = h.minY - 100, maxY = 320;
+  const s = Math.min(W / (maxX - minX), H / (maxY - minY));
+  const ox = (W - (maxX - minX) * s) / 2, oy = (H - (maxY - minY) * s) / 2;
+  const X = x => ox + (x - minX) * s, Y = y => oy + (y - minY) * s;
+  g.fillStyle = "#0a1f12"; g.fillRect(0, 0, W, H);
+  // fairway
+  const all = h.pts.concat([{ x: h.cup.x, y: h.cup.y }]);
+  g.strokeStyle = "#4da95c"; g.lineCap = "round"; g.lineJoin = "round";
+  g.lineWidth = Math.max(8, h.fairR * s * 2);
+  g.beginPath(); g.moveTo(X(all[0].x), Y(all[0].y));
+  for (let i = 1; i < all.length; i++) g.lineTo(X(all[i].x), Y(all[i].y));
+  g.stroke();
+  // water
+  g.fillStyle = "#2f9fd8";
+  for (const w of h.waters) { g.beginPath(); g.arc(X(w.x), Y(w.y), Math.max(3, w.r * s), 0, 7); g.fill(); }
+  // sand
+  g.fillStyle = "#e3cf96";
+  for (const sd of h.sands) { g.beginPath(); g.arc(X(sd.x), Y(sd.y), Math.max(3, sd.rx * s), 0, 7); g.fill(); }
+  // green + cup
+  g.fillStyle = "#63c76f";
+  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), Math.max(8, h.greenR * s), 0, 7); g.fill();
+  g.fillStyle = "#e63946";
+  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), 6, 0, 7); g.fill();
+  // ball
+  g.fillStyle = "#fff";
+  g.beginPath(); g.arc(X(G.ball.x), Y(G.ball.y), 7, 0, 7); g.fill();
+  // tee
+  g.fillStyle = "#ffd60a";
+  g.beginPath(); g.arc(X(h.tee.x), Y(h.tee.y), 6, 0, 7); g.fill();
+}
+function toggleMapExpand(show) {
+  const el = document.getElementById("mapExpand");
+  const willShow = show !== undefined ? show : el.classList.contains("hidden");
+  el.classList.toggle("hidden", !willShow);
+  if (willShow) drawExpandedMap();
+}
+// tap on minimap (top-right) expands it
+document.addEventListener("click", e => {
+  const h = G.hole; if (!h || G.mode !== "play") return;
+  const W = 104, H = 140, m = 10;
+  const x0 = window.innerWidth - W - m, y0 = 86;
+  if (e.clientX >= x0 - 6 && e.clientX <= x0 + W + 6 && e.clientY >= y0 - 6 && e.clientY <= y0 + H + 6) {
+    // don't trigger if the expanded map is already open (the close button handles that)
+    if (!document.getElementById("mapExpand").classList.contains("hidden")) return;
+    toggleMapExpand(true);
+  }
+});
+document.getElementById("mapClose").addEventListener("click", e => {
+  e.stopPropagation();
+  toggleMapExpand(false);
+});
+
 /* ---------- input (slingshot) ---------- */
 // release inside this radius of the drag start = abandoned shot, no fire
 const CANCEL_PX = 40;
@@ -1621,6 +1684,7 @@ canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 document.addEventListener("contextmenu", e => e.preventDefault());
 document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
 
 
 
