@@ -205,10 +205,9 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 17</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 18</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
-  <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
   <button class="menu-btn secondary" id="btnQuitMenu">☰ Main Menu</button>
 </div>
 
@@ -1718,11 +1717,6 @@ function openPause() {
 }
 $("btnResume").addEventListener("click", () => { sfx.click(); showScreen(null); });
 $("btnRestartHole").addEventListener("click", () => { sfx.click(); setupHole(); });
-$("btnResetCam").addEventListener("click", () => {
-  sfx.click();
-  panX = 0; panY = 0; camDist = 1300; camAngle = 0; camPitch = 0.82;
-  toast("📷 Camera reset", 900);
-});
 $("btnQuitMenu").addEventListener("click", () => { sfx.click(); showScreen("home"); });
 /* ---------- screens & UI ---------- */
 const SCREENS = ["home", "levels", "how", "overlay", "pause"];
