@@ -205,7 +205,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 20</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 21</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnQuitMenu">☰ Main Menu</button>
@@ -1488,26 +1488,49 @@ function drawMinimap() {
   roundRectPath(x0 - 6, y0 - 6, W + 12, H + 12, 12); ctx.stroke();
   ctx.save();
   roundRectPath(x0 - 6, y0 - 6, W + 12, H + 12, 12); ctx.clip();
-  // fairway ribbon
+  // fairway ribbon: dark outline, then green fill
   const all = h.pts.concat([h.cup]);
-  ctx.strokeStyle = "#4da95c"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  ctx.lineWidth = Math.max(3, h.fairR * s * 2);
+  const fw = Math.max(4, h.fairR * s * 2);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "#2d6a35"; ctx.lineWidth = fw + 2;
   ctx.beginPath(); ctx.moveTo(X(all[0].x), Y(all[0].y));
   for (let i = 1; i < all.length; i++) ctx.lineTo(X(all[i].x), Y(all[i].y));
   ctx.stroke();
-  // hazards
-  ctx.fillStyle = "#2f9fd8";
-  for (const w of h.waters) { ctx.beginPath(); ctx.arc(X(w.x), Y(w.y), Math.max(2, w.r * s), 0, TAU); ctx.fill(); }
-  ctx.fillStyle = "#e3cf96";
-  for (const sd of h.sands) { ctx.beginPath(); ctx.arc(X(sd.x), Y(sd.y), Math.max(2, sd.rx * s), 0, TAU); ctx.fill(); }
-  // green + cup
-  ctx.fillStyle = "#63c76f";
-  ctx.beginPath(); ctx.arc(X(h.cup.x), Y(h.cup.y), Math.max(3.5, h.greenR * s), 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#55b563"; ctx.lineWidth = fw;
+  ctx.beginPath(); ctx.moveTo(X(all[0].x), Y(all[0].y));
+  for (let i = 1; i < all.length; i++) ctx.lineTo(X(all[i].x), Y(all[i].y));
+  ctx.stroke();
+  // hazards: water with highlight, sand with border
+  for (const w of h.waters) {
+    const r = Math.max(2.5, w.r * s);
+    ctx.fillStyle = "#1e7fb8"; ctx.beginPath(); ctx.arc(X(w.x), Y(w.y), r, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#4db8e8"; ctx.beginPath(); ctx.arc(X(w.x) - r*0.25, Y(w.y) - r*0.25, r*0.45, 0, TAU); ctx.fill();
+  }
+  for (const sd of h.sands) {
+    const r = Math.max(2.5, sd.rx * s);
+    ctx.fillStyle = "#c9b478"; ctx.beginPath(); ctx.arc(X(sd.x), Y(sd.y), r, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#e8d9a8"; ctx.beginPath(); ctx.arc(X(sd.x), Y(sd.y), r*0.7, 0, TAU); ctx.fill();
+  }
+  // green: ellipse matching the shaped green, with light fringe ring
+  const gr = Math.max(5, h.greenR * s);
+  ctx.fillStyle = "#8fd694";
+  ctx.beginPath(); ctx.ellipse(X(h.cup.x), Y(h.cup.y), gr, gr*0.8, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#d4f0d7"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(X(h.cup.x), Y(h.cup.y), gr, gr*0.8, 0, 0, TAU); ctx.stroke();
   ctx.fillStyle = "#e63946";
   ctx.beginPath(); ctx.arc(X(h.cup.x), Y(h.cup.y), 3, 0, TAU); ctx.fill();
-  // ball (pulsing)
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(X(h.cup.x), Y(h.cup.y), 3, 0, TAU); ctx.stroke();
+  // tee marker
+  ctx.fillStyle = "#ffd60a";
+  ctx.beginPath(); ctx.arc(X(h.tee.x), Y(h.tee.y), 2.5, 0, TAU); ctx.fill();
+  // ball (pulsing with glow)
+  const bx = X(G.ball.x), by = Y(G.ball.y);
+  const pulse = 3 + Math.sin(G.time * 5);
+  ctx.fillStyle = "rgba(255,255,255,.35)";
+  ctx.beginPath(); ctx.arc(bx, by, pulse + 2.5, 0, TAU); ctx.fill();
   ctx.fillStyle = "#ffffff";
-  ctx.beginPath(); ctx.arc(X(G.ball.x), Y(G.ball.y), 3 + Math.sin(G.time * 5), 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx, by, pulse, 0, TAU); ctx.fill();
   ctx.restore();
   ctx.restore();
 }
@@ -1542,30 +1565,53 @@ function drawExpandedMap() {
   const ox = (W - (maxX - minX) * s) / 2, oy = (H - (maxY - minY) * s) / 2;
   const X = x => ox + (x - minX) * s, Y = y => oy + (y - minY) * s;
   g.fillStyle = "#0a1f12"; g.fillRect(0, 0, W, H);
-  // fairway
+  // fairway: dark outline then green fill
   const all = h.pts.concat([{ x: h.cup.x, y: h.cup.y }]);
-  g.strokeStyle = "#4da95c"; g.lineCap = "round"; g.lineJoin = "round";
-  g.lineWidth = Math.max(8, h.fairR * s * 2);
+  const fw = Math.max(10, h.fairR * s * 2);
+  g.lineCap = "round"; g.lineJoin = "round";
+  g.strokeStyle = "#2d6a35"; g.lineWidth = fw + 4;
   g.beginPath(); g.moveTo(X(all[0].x), Y(all[0].y));
   for (let i = 1; i < all.length; i++) g.lineTo(X(all[i].x), Y(all[i].y));
   g.stroke();
-  // water
-  g.fillStyle = "#2f9fd8";
-  for (const w of h.waters) { g.beginPath(); g.arc(X(w.x), Y(w.y), Math.max(3, w.r * s), 0, 7); g.fill(); }
-  // sand
-  g.fillStyle = "#e3cf96";
-  for (const sd of h.sands) { g.beginPath(); g.arc(X(sd.x), Y(sd.y), Math.max(3, sd.rx * s), 0, 7); g.fill(); }
-  // green + cup
-  g.fillStyle = "#63c76f";
-  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), Math.max(8, h.greenR * s), 0, 7); g.fill();
+  g.strokeStyle = "#55b563"; g.lineWidth = fw;
+  g.beginPath(); g.moveTo(X(all[0].x), Y(all[0].y));
+  for (let i = 1; i < all.length; i++) g.lineTo(X(all[i].x), Y(all[i].y));
+  g.stroke();
+  // water with highlight
+  for (const w of h.waters) {
+    const r = Math.max(4, w.r * s);
+    g.fillStyle = "#1e7fb8"; g.beginPath(); g.arc(X(w.x), Y(w.y), r, 0, 7); g.fill();
+    g.fillStyle = "#4db8e8"; g.beginPath(); g.arc(X(w.x) - r*0.25, Y(w.y) - r*0.25, r*0.45, 0, 7); g.fill();
+  }
+  // sand with inner highlight
+  for (const sd of h.sands) {
+    const r = Math.max(4, sd.rx * s);
+    g.fillStyle = "#c9b478"; g.beginPath(); g.arc(X(sd.x), Y(sd.y), r, 0, 7); g.fill();
+    g.fillStyle = "#e8d9a8"; g.beginPath(); g.arc(X(sd.x), Y(sd.y), r*0.7, 0, 7); g.fill();
+  }
+  // green: ellipse with fringe ring
+  const gr = Math.max(10, h.greenR * s);
+  g.fillStyle = "#8fd694";
+  g.beginPath(); g.ellipse(X(h.cup.x), Y(h.cup.y), gr, gr*0.8, 0, 0, 7); g.fill();
+  g.strokeStyle = "#d4f0d7"; g.lineWidth = 3;
+  g.beginPath(); g.ellipse(X(h.cup.x), Y(h.cup.y), gr, gr*0.8, 0, 0, 7); g.stroke();
   g.fillStyle = "#e63946";
-  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), 6, 0, 7); g.fill();
-  // ball
-  g.fillStyle = "#fff";
-  g.beginPath(); g.arc(X(G.ball.x), Y(G.ball.y), 7, 0, 7); g.fill();
+  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), 7, 0, 7); g.fill();
+  g.strokeStyle = "#fff"; g.lineWidth = 2;
+  g.beginPath(); g.arc(X(h.cup.x), Y(h.cup.y), 7, 0, 7); g.stroke();
   // tee
   g.fillStyle = "#ffd60a";
   g.beginPath(); g.arc(X(h.tee.x), Y(h.tee.y), 6, 0, 7); g.fill();
+  g.strokeStyle = "#fff"; g.lineWidth = 1.5;
+  g.beginPath(); g.arc(X(h.tee.x), Y(h.tee.y), 6, 0, 7); g.stroke();
+  // ball with glow
+  const bx = X(G.ball.x), by = Y(G.ball.y);
+  g.fillStyle = "rgba(255,255,255,.35)";
+  g.beginPath(); g.arc(bx, by, 12, 0, 7); g.fill();
+  g.fillStyle = "#fff";
+  g.beginPath(); g.arc(bx, by, 8, 0, 7); g.fill();
+  g.strokeStyle = "#333"; g.lineWidth = 1.5;
+  g.beginPath(); g.arc(bx, by, 8, 0, 7); g.stroke();
 }
 function toggleMapExpand(show) {
   const el = document.getElementById("mapExpand");
@@ -2202,13 +2248,13 @@ function buildCourse(h) {
   // green: fringe + dense striped putting surface
   // (no separate fringe mesh: the green's wide feathered edge blends directly into the fairway)
   const _hx = h.cup.x - h.greenC.x, _hz = h.cup.y - h.greenC.y;
-  const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 64, _hx, _hz), h, h.greenC.x, h.greenC.y);
+  const greenGeo = drapeAdd(shapedRingGeo(h, () => 15, (a) => greenEdge(h, a), 12, 128, _hx, _hz), h, h.greenC.x, h.greenC.y);
   // feather the green's edge into the terrain: inner rings sit at full 2.6 lift,
   // outer rings ramp down gradually so there's no visible "plate" lip at the boundary
   {
     const p = greenGeo.attributes.position;
     for (let i = 0; i < p.count; i++) {
-      const ring = Math.floor(i / 64); // 0..12
+      const ring = Math.floor(i / 128); // 0..12
       const lift = ring <= 7 ? 2.6 : ring === 8 ? 2.2 : ring === 9 ? 1.7 : ring === 10 ? 1.2 : ring === 11 ? 0.7 : 0.3;
       p.setY(i, p.getY(i) + lift);
     }
