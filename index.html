@@ -205,7 +205,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 19</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 20</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnQuitMenu">☰ Main Menu</button>
@@ -474,11 +474,12 @@ function genHole(seed, difficulty, parHint) {
     });
   }
   // green undulation: one broad hill with a soft tier step, like a real green (putts bend gently)
+  // exaggerated so the contour is visible without the heatmap
   const gta = rnd() * TAU;
-  const greenTilt = { dx: Math.cos(gta), dy: Math.sin(gta), slope: 0.015 + rnd() * 0.02 };
+  const greenTilt = { dx: Math.cos(gta), dy: Math.sin(gta), slope: 0.035 + rnd() * 0.04 };
   const greenMound = {
     ox: (rnd() * 2 - 1) * greenR * 0.35, oy: (rnd() * 2 - 1) * greenR * 0.35,
-    r: greenR * (0.85 + rnd() * 0.3), amp: 3 + rnd() * 2.5,
+    r: greenR * (0.85 + rnd() * 0.3), amp: 7 + rnd() * 5,
   };
   const sta = rnd() * TAU;
   const greenStep = { dx: Math.cos(sta), dy: Math.sin(sta), amp: 3 + rnd() * 1.5 };
@@ -799,18 +800,18 @@ const LAND_KEEP = { fringe: 0.40, lightrough: 0.40, rough: 0.35, sand: 0.20 }; /
 const SLOPE_G = 800;                        // downhill roll acceleration on hills
 const GREEN_SLOPE_G = 400;                  // fast greens: putts bend more and run out further
 const SLOPE_MIN_SP = 34;                    // below this speed the ball settles instead of trickling
-const BALL_R = 7, CUP_R = 13, MAX_DRAG_PX = 170;
+const BALL_R = 7, CUP_R = 13, MAX_DRAG_PX = 120;
 const GRAV = 1100;                        // vertical gravity (world units/s^2) — floatier, more realistic hang time
 const LOFTS = [0.90, 0.95, 1.00, 1.08, 1.15, 0];   // driver, 5i, 7i, 9i, wedge, putter launch
 
 /* ---------- clubs ---------- */
 const CLUBS = [
-  { name: "Driver", icon: "🚀", max: 1215, min: 148, drag: 170 },   // ~300 yd total on flat
-  { name: "5 Iron", icon: "🏌️", max: 980, min: 116,  drag: 170 },   // ~200 yd full
-  { name: "7 Iron", icon: "🏌️", max: 855, min: 101,  drag: 170 },   // ~160 yd full
-  { name: "9 Iron", icon: "🏌️", max: 753, min: 89,   drag: 170 },   // ~135 yd full
-  { name: "Wedge",  icon: "🪶", max: 632, min: 84,   drag: 170 },   // ~100 yd full
-  { name: "Putter", icon: "🎯", max: 300, min: 50,   drag: 110 },
+  { name: "Driver", icon: "🚀", max: 1215, min: 148, drag: 120 },   // ~300 yd total on flat
+  { name: "5 Iron", icon: "🏌️", max: 980, min: 116,  drag: 120 },   // ~200 yd full
+  { name: "7 Iron", icon: "🏌️", max: 855, min: 101,  drag: 120 },   // ~160 yd full
+  { name: "9 Iron", icon: "🏌️", max: 753, min: 89,   drag: 120 },   // ~135 yd full
+  { name: "Wedge",  icon: "🪶", max: 632, min: 84,   drag: 120 },   // ~100 yd full
+  { name: "Putter", icon: "🎯", max: 300, min: 50,   drag: 80 },
 ];
 const CLUB_CARRY = [2160, 1500, 1210, 1020, 770];  // full-shot carry, world units (8 = 1 yd)   // full-power carries, for club recommendation
 G.club = 0;
