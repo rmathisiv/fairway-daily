@@ -205,7 +205,7 @@
   <div class="logo">⏸️</div>
   <h1 class="game-title">PAUSED</h1>
   <div class="subtitle" id="pauseSub">Take a breath. The ball isn't going anywhere.</div>
-  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 13</div>
+  <div style="opacity:.4;font-size:11px;margin-top:6px;">Build Rev 14</div>
   <button class="menu-btn" id="btnResume">▶️ Resume</button>
   <button class="menu-btn secondary" id="btnRestartHole">⟳ Restart Hole</button>
   <button class="menu-btn secondary" id="btnResetCam">📷 Reset Camera</button>
@@ -792,13 +792,13 @@ const G = {
   done: false,
 };
 
-const FRICTION = { green: 0.95, fringe: 1.6, fairway: 1.8, lightrough: 2.6, rough: 3.6, sand: 7.0, water: 0 };
+const FRICTION = { green: 0.55, fringe: 1.6, fairway: 1.8, lightrough: 2.6, rough: 3.6, sand: 7.0, water: 0 };
 // rollout ordered by club: driver bounds on forever, wedge checks up (index = club)
 const GREEN_KEEP = [0.62, 0.60, 0.38, 0.30, 0.18, 0.10];
 const FAIR_KEEP = [0.21, 0.15, 0.13, 0.13, 0.09, 0.10];
 const LAND_KEEP = { fringe: 0.40, lightrough: 0.40, rough: 0.35, sand: 0.20 }; // rollout on landing
 const SLOPE_G = 800;                        // downhill roll acceleration on hills
-const GREEN_SLOPE_G = 220;                  // gentler: putts bend, never arc wildly
+const GREEN_SLOPE_G = 300;                  // faster greens: putts bend more and run out further
 const SLOPE_MIN_SP = 34;                    // below this speed the ball settles instead of trickling
 const BALL_R = 7, CUP_R = 13, MAX_DRAG_PX = 170;
 const GRAV = 1100;                        // vertical gravity (world units/s^2) — floatier, more realistic hang time
