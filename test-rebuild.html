@@ -1885,7 +1885,7 @@ function frame(now) {
     G.cam.y = lerp(G.cam.y, ty, 1 - Math.exp(-6 * dt));
 
     const onGreen = terrainAt(G.hole, G.ball.x, G.ball.y) === "green";
-    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 500); camPitch = 0.52; camLookTarget = 40; }
+    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 400); camPitch = 0.52; camLookTarget = 60; }
     if (G.state === "aim") G.wasOnGreen = onGreen;
 
     for (let i = G.particles.length - 1; i >= 0; i--) {
@@ -2711,7 +2711,7 @@ function render() {
 
   if (G.state === "roll") { panX *= 0.93; panY *= 0.93; camLook += (140 - camLook) * 0.07; }
 
-  if (G.state === "aim" && h && b && terrainAt(h, b.x, b.y) === "green") camLook += (40 - camLook) * 0.12;
+  if (G.state === "aim" && h && b && terrainAt(h, b.x, b.y) === "green") camLook += (60 - camLook) * 0.12;
   const tx = b.x + panX, tz = b.y + panY;
   const ch = camDist * Math.cos(camPitch), cv = camDist * Math.sin(camPitch);
   camera.near = Math.max(1, camDist * 0.15); camera.far = camDist * 6 + 2000; camera.updateProjectionMatrix();
