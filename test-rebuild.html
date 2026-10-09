@@ -610,14 +610,14 @@ function genHole(seed, difficulty, parHint) {
 
   const proto = { waters, sands, pts, fairR, fairWobPh, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
   const trees = [];
-  const nTree = 16 + Math.floor(rnd() * 10);
+  const nTree = 30 + Math.floor(rnd() * 15);
   for (let i = 0; i < nTree * 14 && trees.length < nTree; i++) {
-    const t = { x: (rnd() * 2 - 1) * 430, y: minY + 40 + rnd() * (maxY - minY - 80), r: 42 + rnd() * 22 };
+    const t = { x: (rnd() + rnd() - 1) * 430, y: minY + 40 + rnd() * (maxY - minY - 80), r: 58 + rnd() * 27 };
     if (terrainAt(proto, t.x, t.y) !== "rough") continue;
     if (Math.hypot(t.x - tee.x, t.y - tee.y) < 160) continue;
     if (Math.hypot(t.x - greenC.x, t.y - greenC.y) < greenR * 1.3) continue;
     let ok = true;
-    for (const o of trees) if (Math.hypot(t.x - o.x, t.y - o.y) < 55) ok = false;
+    for (const o of trees) if (Math.hypot(t.x - o.x, t.y - o.y) < (t.r + o.r) * 0.55) ok = false;
     if (ok) trees.push(t);
   }
 
@@ -1885,7 +1885,7 @@ function frame(now) {
     G.cam.y = lerp(G.cam.y, ty, 1 - Math.exp(-6 * dt));
 
     const onGreen = terrainAt(G.hole, G.ball.x, G.ball.y) === "green";
-    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 820); camPitch = 0.52; }
+    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 820); camPitch = 0.52; camLookTarget = 40; }
     if (G.state === "aim") G.wasOnGreen = onGreen;
 
     for (let i = G.particles.length - 1; i >= 0; i--) {
@@ -2710,6 +2710,8 @@ function render() {
   }
 
   if (G.state === "roll") { panX *= 0.93; panY *= 0.93; camLook += (140 - camLook) * 0.07; }
+
+  if (G.state === "aim" && h && b && terrainAt(h, b.x, b.y) === "green") camLook += (40 - camLook) * 0.12;
   const tx = b.x + panX, tz = b.y + panY;
   const ch = camDist * Math.cos(camPitch), cv = camDist * Math.sin(camPitch);
   camera.near = Math.max(1, camDist * 0.15); camera.far = camDist * 6 + 2000; camera.updateProjectionMatrix();
