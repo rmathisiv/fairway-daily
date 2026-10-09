@@ -438,13 +438,22 @@ function genHole(seed, difficulty, parHint) {
   const doglegSeg = parHint >= 4 ? 1 + Math.floor(rnd() * (segs - 1)) : -1;
   const segLen = D / segs;
   const doglegAmt = doglegSeg > 0 ? segLen * (0.45 + rnd() * 0.35) * (rnd() < 0.5 ? -1 : 1) : 0;
-  const pts = [{ x: 0, y: 0 }];
+  let pts = [{ x: 0, y: 0 }];
   for (let i = 1; i <= segs; i++) {
     const prev = pts[i - 1];
     let nx = clamp(prev.x + (rnd() * 2 - 1) * wander, -320, 320);
     if (i === doglegSeg) nx = clamp(nx + doglegAmt, -320, 320);   // the elbow
     else if (i > doglegSeg && doglegSeg > 0) nx = clamp(prev.x + (rnd() * 2 - 1) * wander * 0.5, -320, 320);
     pts.push({ x: nx, y: prev.y - D / segs });
+  }
+
+  for (let _sm = 0; _sm < 2; _sm++) {
+    const _np = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++)
+      _np.push({ x: pts[i].x * 0.5 + (pts[i - 1].x + pts[i + 1].x) * 0.25,
+                 y: pts[i].y * 0.5 + (pts[i - 1].y + pts[i + 1].y) * 0.25 });
+    _np.push(pts[pts.length - 1]);
+    pts = _np;
   }
   const fairR = 200 - diff * 30 + rnd() * 20;            // fairway corridor radius (wider)
 
@@ -2161,8 +2170,10 @@ function drapeAdd(geo, h, ox, oz) {
 
 function fairWidthAt(h, t) {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  const base = 0.70 + 0.30 * Math.sin(t * Math.PI);
-  return h.fairR * base * (1 + 0.10 * Math.sin(t * 6.3 + (h.fairWobPh || 0)));
+  const base = 0.66 + 0.34 * Math.sin(t * Math.PI);
+  const ph = h.fairWobPh || 0;
+  const wob = 1 + 0.13 * Math.sin(t * 7.7 + ph) + 0.06 * Math.sin(t * 15.3 + ph * 1.7);
+  return h.fairR * base * wob;
 }
 function fairwayRibbonGeo(h) {
 
