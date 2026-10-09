@@ -447,6 +447,13 @@ function genHole(seed, difficulty, parHint) {
     pts.push({ x: nx, y: prev.y - D / segs });
   }
   const fairR = 200 - diff * 30 + rnd() * 20;            // fairway corridor radius (wider)
+
+  const fairWobPh = rnd() * TAU;
+  const fairW = pts.map((p, i) => {
+    const t = i / (pts.length - 1);
+    const base = 0.74 + 0.26 * Math.sin(t * Math.PI);
+    return fairR * base * (1 + 0.07 * Math.sin(t * 5.1 + fairWobPh));
+  });
   const greenR = D < 1600 ? 190 : 280;                   // shorter holes get proportionally smaller greens
 
   const gSquash = 0.65 + rnd() * 0.35;                 // 0.65-1.0 oval squash (1 = circle)
@@ -519,15 +526,16 @@ function genHole(seed, difficulty, parHint) {
     if (cross && dist(cross, greenC) < greenR + 240) cross = null;
     if (cross) {
       const px = -cdy, py = cdx;                       // across the hole
-      const r0 = 60 + rnd() * 16;
+      const hw = 60 + rnd() * 16;                       // half-width of the band
+      const cpts = [];
       for (let k = -3; k <= 3; k++) {
         const meander = Math.sin(k * 1.2 + rnd() * 0.6) * 34;
-        waters.push({
+        cpts.push({
           x: clamp(cross.x + px * k * 80 + cdx * meander, -430, 430),
           y: clamp(cross.y + py * k * 80 + cdy * meander, cup.y - 200, 280),
-          r: r0 * (0.92 + rnd() * 0.16),
         });
       }
+      waters.push({ river: true, cpts, hw });
     } else waterKind = "lake";   // no good crossing on this hole — fall back to a lake
   }
   if (waterKind === "lake") {
@@ -537,19 +545,17 @@ function genHole(seed, difficulty, parHint) {
     const cx = clamp(p.x + side * (fairR + 150 + rnd() * 80), -400, 400);
     const cy = clamp(p.y + (rnd() * 2 - 1) * 130, cup.y - 200, 280);
     if (dist({ x: cx, y: cy }, tee) > 200 && dist({ x: cx, y: cy }, greenC) > greenR + 380) {
-      const r0 = 88 + rnd() * 30;
-      const blobs = [[0, 0, 1], [0.75, 0.35, 0.8], [-0.65, 0.45, 0.78], [0.25, -0.7, 0.82], [-0.45, -0.55, 0.7]];
-      for (const [ox, oy, s] of blobs)
-        waters.push({ x: clamp(cx + ox * r0, -430, 430), y: clamp(cy + oy * r0, cup.y - 200, 280), r: r0 * s });
+      const w = { lake: true, x: cx, y: cy, r: 110 + rnd() * 36,
+        wob: 0.10 + rnd() * 0.08, wobPh: rnd() * TAU,
+        wob2: 0.05 + rnd() * 0.05, wobPh2: rnd() * TAU };
+      waters.push(w);
 
-      for (const w of waters) {
-        let guard = 0;
-        while (pathDist(w.x, w.y) < w.r + 60 && guard++ < 24) {
-          w.x += (w.x >= 0 ? 14 : -14);
-          w.x = clamp(w.x, -420, 420);
-        }
-        if (pathDist(w.x, w.y) < w.r + 60) w.r = Math.max(40, pathDist(w.x, w.y) - 60);
+      let guard = 0;
+      while (pathDist(w.x, w.y) < w.r + 60 && guard++ < 24) {
+        w.x += (w.x >= 0 ? 14 : -14);
+        w.x = clamp(w.x, -420, 420);
       }
+      if (pathDist(w.x, w.y) < w.r + 60) w.r = Math.max(40, pathDist(w.x, w.y) - 60);
     }
   }
 
@@ -574,13 +580,20 @@ function genHole(seed, difficulty, parHint) {
     }
     if (dist(s, tee) < 120 || dist(s, greenC) < greenR * 1.3) continue;
     let bad = false;
-    for (const w of waters) if (Math.hypot(s.x - w.x, s.y - w.y) < w.r + 40) bad = true;
+    for (const w of waters) {
+      if (w.river) {
+        for (let _ri = 0; _ri < w.cpts.length - 1 && !bad; _ri++)
+          if (distToSeg(s.x, s.y, w.cpts[_ri], w.cpts[_ri + 1]) < w.hw + 40) bad = true;
+      } else if (w.lake) {
+        if (Math.hypot(s.x - w.x, s.y - w.y) < w.r * 1.18 + 40) bad = true;
+      } else if (Math.hypot(s.x - w.x, s.y - w.y) < w.r + 40) bad = true;
+    }
     if (!bad) sands.push(s);
   }
 
   const minY = Math.min(cup.y, greenC.y) - 340, maxY = 240;
 
-  const proto = { waters, sands, pts, fairR, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
+  const proto = { waters, sands, pts, fairR, fairW, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
   const trees = [];
   const nTree = 16 + Math.floor(rnd() * 10);
   for (let i = 0; i < nTree * 14 && trees.length < nTree; i++) {
@@ -614,7 +627,7 @@ function genHole(seed, difficulty, parHint) {
   const windMph = rnd() * 20;
   const windAng = rnd() * TAU;
   const windAx = windMph * 12 * Math.cos(windAng), windAy = windMph * 12 * Math.sin(windAng);
-  return { tee, cup, greenC, pts, fairR, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
+  return { tee, cup, greenC, pts, fairR, fairW, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
 }
 
 function sstep(a, b, x) {
@@ -688,12 +701,35 @@ function terrainAt(hole, x, y) {
   const _td = Math.hypot(_tdx, _tdy), _te = greenEdge(hole, Math.atan2(_tdy, _tdx));
   if (_td < _te) return "green";
   if (_td < _te + 20) return "fringe";
-  for (const w of hole.waters) if (Math.hypot(x - w.x, y - w.y) < w.r) return "water";
-  let dF = 1e9;
-  for (let i = 0; i < hole.pts.length - 1; i++)
-    dF = Math.min(dF, distToSeg(x, y, hole.pts[i], hole.pts[i + 1]));
-  if (dF < hole.fairR) return "fairway";
-  if (dF < hole.fairR + 110) return "lightrough";   // first cut
+  for (const w of hole.waters) {
+    if (w.river) {   // capsule: distance to the river's centerline
+      let _dr = 1e9;
+      for (let _ri = 0; _ri < w.cpts.length - 1; _ri++)
+        _dr = Math.min(_dr, distToSeg(x, y, w.cpts[_ri], w.cpts[_ri + 1]));
+      if (_dr < w.hw) return "water";
+    } else if (w.lake) {   // organic blob: wobbled radius (same shape as drawn)
+      const _wa = Math.atan2(y - w.y, x - w.x);
+      const _wr = w.r * (1 + w.wob * Math.cos(2 * _wa + w.wobPh) + w.wob2 * Math.cos(3 * _wa + w.wobPh2));
+      if (Math.hypot(x - w.x, y - w.y) < _wr) return "water";
+    } else if (Math.hypot(x - w.x, y - w.y) < w.r) return "water";
+  }
+  let dF = 1e9, wF = hole.fairR;
+  for (let i = 0; i < hole.pts.length - 1; i++) {
+    const _a = hole.pts[i], _b = hole.pts[i + 1];
+    const _d = distToSeg(x, y, _a, _b);
+    if (_d < dF) {
+      dF = _d;
+
+      if (hole.fairW) {
+        const _dx = _b.x - _a.x, _dy = _b.y - _a.y, _L2 = _dx * _dx + _dy * _dy || 1;
+        let _t = ((x - _a.x) * _dx + (y - _a.y) * _dy) / _L2;
+        _t = _t < 0 ? 0 : _t > 1 ? 1 : _t;
+        wF = hole.fairW[i] + (hole.fairW[i + 1] - hole.fairW[i]) * _t;
+      }
+    }
+  }
+  if (dF < wF) return "fairway";
+  if (dF < wF + 110) return "lightrough";   // first cut
   return "rough";                                   // heavy rough
 }
 function distToSeg(px, py, a, b) {
@@ -704,6 +740,23 @@ function distToSeg(px, py, a, b) {
   return Math.hypot(px - (a.x + dx * t), py - (a.y + dy * t));
 }
 
+function traceWater(g, w, X, Y, s) {
+  g.beginPath();
+  if (w.river) {
+    g.moveTo(X(w.cpts[0].x), Y(w.cpts[0].y));
+    for (let i = 1; i < w.cpts.length; i++) g.lineTo(X(w.cpts[i].x), Y(w.cpts[i].y));
+  } else if (w.lake) {
+    for (let j = 0; j <= 48; j++) {
+      const a = (j / 48) * TAU;
+      const rr = w.r * (1 + w.wob * Math.cos(2 * a + w.wobPh) + w.wob2 * Math.cos(3 * a + w.wobPh2)) * s;
+      const px = X(w.x) + Math.cos(a) * rr, py = Y(w.y) + Math.sin(a) * rr;
+      if (j === 0) g.moveTo(px, py); else g.lineTo(px, py);
+    }
+    g.closePath();
+  } else {
+    g.arc(X(w.x), Y(w.y), Math.max(1, w.r * s), 0, TAU);
+  }
+}
 /* ---------- game state ---------- */
 /* ---------- three.js setup ---------- */
 const canvas = $("game");
@@ -918,7 +971,10 @@ function setupHole() {
   G.sink = null;
   G.cam.x = h.tee.x; G.cam.y = h.tee.y;
   buildCourse(h);
-  panX = 0; panY = 0; camAngle = 0; camPitch = 0.70;   // fresh camera every hole (flatter isometric like Coffee Golf)
+  panX = 0; panY = 0; camPitch = 0.70;   // fresh camera every hole (flatter isometric like Coffee Golf)
+
+  { const _dx0 = h.cup.x - h.tee.x, _dy0 = h.cup.y - h.tee.y, _L0 = Math.hypot(_dx0, _dy0) || 1;
+    camAngle = Math.atan2(-_dx0 / _L0, -_dy0 / _L0); }
   { // frame the whole hole at hole start (pinch still adjusts freely)
     const hl = (h.cup && h.tee) ? Math.hypot(h.cup.x - h.tee.x, h.cup.y - h.tee.y) : 3000;
     camDist = Math.min(3400, Math.max(1500, hl * 1.05));
@@ -1349,14 +1405,21 @@ function render() {
   }
 
   for (const w of h.waters) {
-    ctx.fillStyle = "#2f9fd8";
-    ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill();
+    if (w.river) {
+      ctx.strokeStyle = "#2f9fd8"; ctx.lineWidth = w.hw * 2; ctx.lineCap = "round";
+      traceWater(ctx, w, _x => _x, _y => _y, 1); ctx.stroke();
+    } else {
+      ctx.fillStyle = "#2f9fd8";
+      traceWater(ctx, w, _x => _x, _y => _y, 1); ctx.fill();
+    }
+    const _wx = w.river ? w.cpts[3].x : w.x, _wy = w.river ? w.cpts[3].y : w.y;
+    const _wr = w.river ? w.hw : w.r;
     ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 3;
     const t = G.time * 1.6;
     for (let i = 0; i < 3; i++) {
-      const rr = w.r * (0.35 + 0.22 * i);
+      const rr = _wr * (0.35 + 0.22 * i);
       ctx.beginPath();
-      ctx.arc(w.x, w.y, rr, t + i * 2.1, t + i * 2.1 + 1.1);
+      ctx.arc(_wx, _wy, rr, t + i * 2.1, t + i * 2.1 + 1.1);
       ctx.stroke();
     }
   }
@@ -1514,9 +1577,14 @@ function drawExpandedMap() {
   g.stroke();
 
   for (const w of h.waters) {
-    const r = Math.max(4, w.r * s);
-    g.fillStyle = "#1e7fb8"; g.beginPath(); g.arc(X(w.x), Y(w.y), r, 0, 7); g.fill();
-    g.fillStyle = "#4db8e8"; g.beginPath(); g.arc(X(w.x) - r*0.25, Y(w.y) - r*0.25, r*0.45, 0, 7); g.fill();
+    if (w.river) {
+      g.strokeStyle = "#1e7fb8"; g.lineWidth = Math.max(4, w.hw * 2 * s); g.lineCap = "round";
+      traceWater(g, w, X, Y, s); g.stroke();
+    } else {
+      const r = Math.max(4, w.r * s);
+      g.fillStyle = "#1e7fb8"; traceWater(g, w, X, Y, s); g.fill();
+      g.fillStyle = "#4db8e8"; g.beginPath(); g.arc(X(w.x) - r*0.25, Y(w.y) - r*0.25, r*0.45, 0, 7); g.fill();
+    }
   }
 
   for (const sd of h.sands) {
@@ -1997,6 +2065,99 @@ function drapeDisc(h, cx, cy, r, lift, mat, inner, seg) {
   return m;
 }
 
+function capsuleGridGeo(h, cpts, halfW, lift) {
+  const n = cpts.length, capN = 6;
+  const path = [];
+  { // rounded start cap: arc of points around cpts[0]
+    const a = cpts[0], b = cpts[1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const f = Math.atan2(dy, dx);
+    for (let k = 1; k <= capN; k++) {
+      const ang = f + Math.PI / 2 + (k / capN) * Math.PI;
+      path.push({ x: a.x + Math.cos(ang) * halfW, y: a.y + Math.sin(ang) * halfW });
+    }
+  }
+  for (const p of cpts) path.push({ x: p.x, y: p.y });
+  { // rounded end cap
+    const a = cpts[n - 2], b = cpts[n - 1];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const f = Math.atan2(dy, dx);
+    for (let k = 1; k <= capN; k++) {
+      const ang = f - Math.PI / 2 + (k / capN) * Math.PI;
+      path.push({ x: b.x + Math.cos(ang) * halfW, y: b.y + Math.sin(ang) * halfW });
+    }
+  }
+  const sp = [];
+  const segs = 4;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i], b = path[i + 1];
+    for (let s = 0; s < segs; s++) {
+      const t = s / segs;
+      sp.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    }
+  }
+  sp.push({ x: path[path.length - 1].x, y: path[path.length - 1].y });
+  const m = sp.length, W = 8;
+  const verts = new Float32Array(m * W * 3);
+  const idx = [];
+  for (let i = 0; i < m; i++) {
+    const pt = sp[i];
+    const p0 = sp[Math.max(0, i - 1)], p1 = sp[Math.min(m - 1, i + 1)];
+    let dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const px = -dy, py = dx;
+    for (let k = 0; k < W; k++) {
+      const f = (k / (W - 1)) * 2 - 1;
+      verts.set([pt.x + px * halfW * f, 0, pt.y + py * halfW * f], (i * W + k) * 3);
+    }
+    if (i < m - 1) {
+      for (let k = 0; k < W - 1; k++) {
+        const a = i * W + k, b2 = a + 1, c = a + W, d = c + 1;
+        idx.push(a, c, b2, b2, c, d);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  drapeAdd(g, h, 0, 0);
+  const fp = g.attributes.position;
+  for (let i = 0; i < fp.count; i++) fp.setY(i, fp.getY(i) + lift);
+  fp.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
+function wobDiscMesh(h, cx, cy, r, wob, wobPh, wob2, wobPh2, lift, mat, seg) {
+  const rings = 6;
+  const verts = [], idx = [];
+  const edge = (a) => r * (1 + wob * Math.cos(2 * a + wobPh) + wob2 * Math.cos(3 * a + wobPh2));
+  for (let i = 0; i <= rings; i++) {
+    for (let j = 0; j < seg; j++) {
+      const a = (j / seg) * TAU;
+      const rr = edge(a) * (i / rings);
+      verts.push(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+    }
+  }
+  const V = (i, j) => i * seg + (((j % seg) + seg) % seg);
+  for (let i = 1; i <= rings; i++) for (let j = 0; j < seg; j++)
+    idx.push(V(i - 1, j), V(i - 1, j + 1), V(i, j), V(i - 1, j + 1), V(i, j + 1), V(i, j));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++)
+    p.setY(i, groundH(h, cx + p.getX(i), cy + p.getZ(i)) + lift);
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.position.set(cx, 0, cy);
+  return mesh;
+}
 function shadeCavity(geo, lo, hi) {
   const p = geo.attributes.position, n = p.count;
   let mn = Infinity, mx = -Infinity;
@@ -2026,7 +2187,7 @@ function fairwayRibbonGeo(h) {
   const t = distToCup > 0 ? stopDist / distToCup : 0;
   const endPt = { x: lastPt.x + dx * t, y: lastPt.y + dy * t };
   const path = h.pts.concat([endPt]);
-  const halfW = h.fairR;
+  const pathW = h.fairW.concat([h.fairW[h.fairW.length - 1]]); // per-point half-widths (organic, not rectangular)
 
   const pts = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -2034,10 +2195,11 @@ function fairwayRibbonGeo(h) {
     const segs = 24;
     for (let s = 0; s < segs; s++) {
       const t = s / segs;
-      pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
+                 w: pathW[i] + (pathW[i + 1] - pathW[i]) * t });
     }
   }
-  pts.push({ x: path[path.length - 1].x, y: path[path.length - 1].y });
+  pts.push({ x: path[path.length - 1].x, y: path[path.length - 1].y, w: pathW[pathW.length - 1] });
   const n = pts.length;
   const W = 6; // vertices across the ribbon: the drape follows the hills across
 
@@ -2051,8 +2213,8 @@ function fairwayRibbonGeo(h) {
     const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
 
     const px = -dy, py = dx;
-    const lx = p.x + px * halfW, ly = p.y + py * halfW;
-    const rx = p.x - px * halfW, ry = p.y - py * halfW;
+    const lx = p.x + px * p.w, ly = p.y + py * p.w;
+    const rx = p.x - px * p.w, ry = p.y - py * p.w;
     for (let k = 0; k < W; k++) {
       const f = k / (W - 1); // 0 = left edge, 1 = right edge
       verts.set([lx + (rx - lx) * f, 0, ly + (ry - ly) * f], (i * W + k) * 3);
@@ -2319,15 +2481,26 @@ function buildCourse(h) {
 
   let wi = 0;
   for (const w of h.waters) {
-    const shore = drapeDisc(h, w.x, w.y, w.r * 1.18, 2.7, std(0xd9c48f), 0, 48);
-    shore.receiveShadow = true;
-    courseGroup.add(shore);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x2f9fd8, roughness: 0.25, metalness: 0.3 });
 
     const lift = w.island ? 1.2 : 3.2 + (wi % 5) * 0.18;
-    const m = drapeDisc(h, w.x, w.y, w.r, lift, mat, 0, w.island ? 72 : 48);
-    m.receiveShadow = false;
-    waterMats.push(mat); courseGroup.add(m);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2f9fd8, roughness: 0.25, metalness: 0.3 });
+    const shoreMat = std(0xd9c48f);
+    if (w.river) {
+      const shore = new THREE.Mesh(capsuleGridGeo(h, w.cpts, w.hw * 1.22, 2.7), shoreMat);
+      shore.receiveShadow = true; courseGroup.add(shore);
+      const m = new THREE.Mesh(capsuleGridGeo(h, w.cpts, w.hw, lift), mat);
+      m.receiveShadow = false; waterMats.push(mat); courseGroup.add(m);
+    } else if (w.lake) {
+      const shore = wobDiscMesh(h, w.x, w.y, w.r * 1.18, w.wob, w.wobPh, w.wob2, w.wobPh2, 2.7, shoreMat, 48);
+      shore.receiveShadow = true; courseGroup.add(shore);
+      const m = wobDiscMesh(h, w.x, w.y, w.r, w.wob, w.wobPh, w.wob2, w.wobPh2, lift, mat, 64);
+      m.receiveShadow = false; waterMats.push(mat); courseGroup.add(m);
+    } else { // island disc with the green rising out of it
+      const shore = drapeDisc(h, w.x, w.y, w.r * 1.18, 1.0, shoreMat, 0, 48);
+      shore.receiveShadow = true; courseGroup.add(shore);
+      const m = drapeDisc(h, w.x, w.y, w.r, lift, mat, 0, 72);
+      m.receiveShadow = false; waterMats.push(mat); courseGroup.add(m);
+    }
     wi++;
   }
 
@@ -2718,7 +2891,12 @@ function drawMinimap() {
   for (let i = 1; i < all.length; i++) mm.lineTo(X(all[i].x), Y(all[i].y));
   mm.stroke();
   mm.fillStyle = "#2f9fd8";
-  for (const w of h.waters) { mm.beginPath(); mm.arc(X(w.x), Y(w.y), Math.max(4, w.r * s), 0, TAU); mm.fill(); }
+  for (const w of h.waters) {
+    if (w.river) {
+      mm.strokeStyle = "#2f9fd8"; mm.lineWidth = Math.max(4, w.hw * 2 * s); mm.lineCap = "round";
+      traceWater(mm, w, X, Y, s); mm.stroke();
+    } else { traceWater(mm, w, X, Y, s); mm.fill(); }
+  }
   mm.fillStyle = "#e3cf96";
   for (const sd2 of h.sands) { mm.beginPath(); mm.arc(X(sd2.x), Y(sd2.y), Math.max(4, sd2.rx * s), 0, TAU); mm.fill(); }
   mm.fillStyle = "#63c76f";
