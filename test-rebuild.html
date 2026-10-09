@@ -449,11 +449,6 @@ function genHole(seed, difficulty, parHint) {
   const fairR = 200 - diff * 30 + rnd() * 20;            // fairway corridor radius (wider)
 
   const fairWobPh = rnd() * TAU;
-  const fairW = pts.map((p, i) => {
-    const t = i / (pts.length - 1);
-    const base = 0.74 + 0.26 * Math.sin(t * Math.PI);
-    return fairR * base * (1 + 0.07 * Math.sin(t * 5.1 + fairWobPh));
-  });
   const greenR = D < 1600 ? 190 : 280;                   // shorter holes get proportionally smaller greens
 
   const gSquash = 0.65 + rnd() * 0.35;                 // 0.65-1.0 oval squash (1 = circle)
@@ -527,13 +522,24 @@ function genHole(seed, difficulty, parHint) {
     if (cross) {
       const px = -cdy, py = cdx;                       // across the hole
       const hw = 60 + rnd() * 16;                       // half-width of the band
-      const cpts = [];
+      let cpts = [];
       for (let k = -3; k <= 3; k++) {
         const meander = Math.sin(k * 1.2 + rnd() * 0.6) * 34;
         cpts.push({
           x: clamp(cross.x + px * k * 80 + cdx * meander, -430, 430),
           y: clamp(cross.y + py * k * 80 + cdy * meander, cup.y - 200, 280),
         });
+      }
+
+      {
+        const sm = [cpts[0]];
+        for (let i = 0; i < cpts.length - 1; i++) {
+          const a = cpts[i], b = cpts[i + 1];
+          sm.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+          sm.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+        }
+        sm.push(cpts[cpts.length - 1]);
+        cpts = sm;
       }
       waters.push({ river: true, cpts, hw });
     } else waterKind = "lake";   // no good crossing on this hole — fall back to a lake
@@ -593,7 +599,7 @@ function genHole(seed, difficulty, parHint) {
 
   const minY = Math.min(cup.y, greenC.y) - 340, maxY = 240;
 
-  const proto = { waters, sands, pts, fairR, fairW, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
+  const proto = { waters, sands, pts, fairR, fairWobPh, cup, greenC, greenR, gSquash, gWob, gWobPh, gWob2, gWob2Ph };
   const trees = [];
   const nTree = 16 + Math.floor(rnd() * 10);
   for (let i = 0; i < nTree * 14 && trees.length < nTree; i++) {
@@ -627,7 +633,7 @@ function genHole(seed, difficulty, parHint) {
   const windMph = rnd() * 20;
   const windAng = rnd() * TAU;
   const windAx = windMph * 12 * Math.cos(windAng), windAy = windMph * 12 * Math.sin(windAng);
-  return { tee, cup, greenC, pts, fairR, fairW, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
+  return { tee, cup, greenC, pts, fairR, fairWobPh, greenR, hills, greenTilt, greenMound, greenStep, elevD, gSquash, gWob, gWobPh, gWob2, gWob2Ph, waters, sands, trees, bushes, dots, par, minY, maxY, diff, seed, islandR, windMph, windAng, windAx, windAy };
 }
 
 function sstep(a, b, x) {
@@ -720,12 +726,10 @@ function terrainAt(hole, x, y) {
     if (_d < dF) {
       dF = _d;
 
-      if (hole.fairW) {
-        const _dx = _b.x - _a.x, _dy = _b.y - _a.y, _L2 = _dx * _dx + _dy * _dy || 1;
-        let _t = ((x - _a.x) * _dx + (y - _a.y) * _dy) / _L2;
-        _t = _t < 0 ? 0 : _t > 1 ? 1 : _t;
-        wF = hole.fairW[i] + (hole.fairW[i + 1] - hole.fairW[i]) * _t;
-      }
+      const _dx = _b.x - _a.x, _dy = _b.y - _a.y, _L2 = _dx * _dx + _dy * _dy || 1;
+      let _t = ((x - _a.x) * _dx + (y - _a.y) * _dy) / _L2;
+      _t = _t < 0 ? 0 : _t > 1 ? 1 : _t;
+      wF = fairWidthAt(hole, (i + _t) / (hole.pts.length - 1));
     }
   }
   if (dF < wF) return "fairway";
@@ -2065,70 +2069,47 @@ function drapeDisc(h, cx, cy, r, lift, mat, inner, seg) {
   return m;
 }
 
-function capsuleGridGeo(h, cpts, halfW, lift) {
-  const n = cpts.length, capN = 6;
-  const path = [];
-  { // rounded start cap: arc of points around cpts[0]
-    const a = cpts[0], b = cpts[1];
-    let dx = b.x - a.x, dy = b.y - a.y;
-    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-    const f = Math.atan2(dy, dx);
-    for (let k = 1; k <= capN; k++) {
-      const ang = f + Math.PI / 2 + (k / capN) * Math.PI;
-      path.push({ x: a.x + Math.cos(ang) * halfW, y: a.y + Math.sin(ang) * halfW });
-    }
+function riverMesh(h, w, halfW, lift, color, opacity) {
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (const p of w.cpts) {
+    minX = Math.min(minX, p.x - halfW); maxX = Math.max(maxX, p.x + halfW);
+    minY = Math.min(minY, p.y - halfW); maxY = Math.max(maxY, p.y + halfW);
   }
-  for (const p of cpts) path.push({ x: p.x, y: p.y });
-  { // rounded end cap
-    const a = cpts[n - 2], b = cpts[n - 1];
-    let dx = b.x - a.x, dy = b.y - a.y;
-    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-    const f = Math.atan2(dy, dx);
-    for (let k = 1; k <= capN; k++) {
-      const ang = f - Math.PI / 2 + (k / capN) * Math.PI;
-      path.push({ x: b.x + Math.cos(ang) * halfW, y: b.y + Math.sin(ang) * halfW });
-    }
+  const W = maxX - minX, H = maxY - minY;
+  const sc = 2;
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(2, Math.ceil(W * sc));
+  cv.height = Math.max(2, Math.ceil(H * sc));
+  const g = cv.getContext("2d");
+  g.strokeStyle = "#fff";
+  g.lineWidth = halfW * 2 * sc;
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  g.beginPath();
+  g.moveTo((w.cpts[0].x - minX) * sc, (w.cpts[0].y - minY) * sc);
+  for (let i = 1; i < w.cpts.length; i++)
+    g.lineTo((w.cpts[i].x - minX) * sc, (w.cpts[i].y - minY) * sc);
+  g.stroke();
+  const tex = new THREE.CanvasTexture(cv);
+  const mat = new THREE.MeshStandardMaterial({
+    color: color, roughness: 0.25, metalness: 0.3,
+    alphaMap: tex, transparent: true, opacity: opacity,
+  });
+  const segX = Math.min(48, Math.max(8, Math.round(W / 16)));
+  const segY = Math.min(32, Math.max(8, Math.round(H / 16)));
+  const geo = new THREE.PlaneGeometry(W, H, segX, segY);
+  geo.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(minX + W / 2, 0, minY + H / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const wx = pos.getX(i) + minX + W / 2;
+    const wz = pos.getZ(i) + minY + H / 2;
+    pos.setY(i, groundH(h, wx, wz) + lift);
   }
-  const sp = [];
-  const segs = 4;
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i], b = path[i + 1];
-    for (let s = 0; s < segs; s++) {
-      const t = s / segs;
-      sp.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
-    }
-  }
-  sp.push({ x: path[path.length - 1].x, y: path[path.length - 1].y });
-  const m = sp.length, W = 8;
-  const verts = new Float32Array(m * W * 3);
-  const idx = [];
-  for (let i = 0; i < m; i++) {
-    const pt = sp[i];
-    const p0 = sp[Math.max(0, i - 1)], p1 = sp[Math.min(m - 1, i + 1)];
-    let dx = p1.x - p0.x, dy = p1.y - p0.y;
-    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-    const px = -dy, py = dx;
-    for (let k = 0; k < W; k++) {
-      const f = (k / (W - 1)) * 2 - 1;
-      verts.set([pt.x + px * halfW * f, 0, pt.y + py * halfW * f], (i * W + k) * 3);
-    }
-    if (i < m - 1) {
-      for (let k = 0; k < W - 1; k++) {
-        const a = i * W + k, b2 = a + 1, c = a + W, d = c + 1;
-        idx.push(a, c, b2, b2, c, d);
-      }
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(verts, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  drapeAdd(g, h, 0, 0);
-  const fp = g.attributes.position;
-  for (let i = 0; i < fp.count; i++) fp.setY(i, fp.getY(i) + lift);
-  fp.needsUpdate = true;
-  g.computeVertexNormals();
-  return g;
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return { mesh: mesh, mat: mat };
 }
 
 function wobDiscMesh(h, cx, cy, r, wob, wobPh, wob2, wobPh2, lift, mat, seg) {
@@ -2178,6 +2159,11 @@ function drapeAdd(geo, h, ox, oz) {
   return geo;
 }
 
+function fairWidthAt(h, t) {
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const base = 0.70 + 0.30 * Math.sin(t * Math.PI);
+  return h.fairR * base * (1 + 0.10 * Math.sin(t * 6.3 + (h.fairWobPh || 0)));
+}
 function fairwayRibbonGeo(h) {
 
   const lastPt = h.pts[h.pts.length - 1];
@@ -2187,7 +2173,7 @@ function fairwayRibbonGeo(h) {
   const t = distToCup > 0 ? stopDist / distToCup : 0;
   const endPt = { x: lastPt.x + dx * t, y: lastPt.y + dy * t };
   const path = h.pts.concat([endPt]);
-  const pathW = h.fairW.concat([h.fairW[h.fairW.length - 1]]); // per-point half-widths (organic, not rectangular)
+  const nSeg = h.pts.length - 1;
 
   const pts = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -2196,10 +2182,10 @@ function fairwayRibbonGeo(h) {
     for (let s = 0; s < segs; s++) {
       const t = s / segs;
       pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
-                 w: pathW[i] + (pathW[i + 1] - pathW[i]) * t });
+                 w: fairWidthAt(h, (i + t) / nSeg) });
     }
   }
-  pts.push({ x: path[path.length - 1].x, y: path[path.length - 1].y, w: pathW[pathW.length - 1] });
+  pts.push({ x: path[path.length - 1].x, y: path[path.length - 1].y, w: fairWidthAt(h, 1) });
   const n = pts.length;
   const W = 6; // vertices across the ribbon: the drape follows the hills across
 
@@ -2486,10 +2472,10 @@ function buildCourse(h) {
     const mat = new THREE.MeshStandardMaterial({ color: 0x2f9fd8, roughness: 0.25, metalness: 0.3 });
     const shoreMat = std(0xd9c48f);
     if (w.river) {
-      const shore = new THREE.Mesh(capsuleGridGeo(h, w.cpts, w.hw * 1.22, 2.7), shoreMat);
-      shore.receiveShadow = true; courseGroup.add(shore);
-      const m = new THREE.Mesh(capsuleGridGeo(h, w.cpts, w.hw, lift), mat);
-      m.receiveShadow = false; waterMats.push(mat); courseGroup.add(m);
+      const sh = riverMesh(h, w, w.hw * 1.22, 2.7, 0xd9c48f, 1);
+      sh.mesh.receiveShadow = true; courseGroup.add(sh.mesh);
+      const rm = riverMesh(h, w, w.hw, lift, 0x2f9fd8, 0.9);
+      rm.mesh.receiveShadow = false; waterMats.push(rm.mat); courseGroup.add(rm.mesh);
     } else if (w.lake) {
       const shore = wobDiscMesh(h, w.x, w.y, w.r * 1.18, w.wob, w.wobPh, w.wob2, w.wobPh2, 2.7, shoreMat, 48);
       shore.receiveShadow = true; courseGroup.add(shore);
