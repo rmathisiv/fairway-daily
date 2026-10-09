@@ -536,7 +536,7 @@ function genHole(seed, difficulty, parHint) {
     const side = rnd() < 0.5 ? -1 : 1;
     const cx = clamp(p.x + side * (fairR + 150 + rnd() * 80), -400, 400);
     const cy = clamp(p.y + (rnd() * 2 - 1) * 130, cup.y - 200, 280);
-    if (dist({ x: cx, y: cy }, tee) > 200 && dist({ x: cx, y: cy }, greenC) > greenR + 130) {
+    if (dist({ x: cx, y: cy }, tee) > 200 && dist({ x: cx, y: cy }, greenC) > greenR + 380) {
       const r0 = 88 + rnd() * 30;
       const blobs = [[0, 0, 1], [0.75, 0.35, 0.8], [-0.65, 0.45, 0.78], [0.25, -0.7, 0.82], [-0.45, -0.55, 0.7]];
       for (const [ox, oy, s] of blobs)
@@ -2319,12 +2319,12 @@ function buildCourse(h) {
 
   let wi = 0;
   for (const w of h.waters) {
-    const shore = drapeDisc(h, w.x, w.y, w.r * 1.18, 1.0, std(0xd9c48f), 0, 48);
+    const shore = drapeDisc(h, w.x, w.y, w.r * 1.18, 2.7, std(0xd9c48f), 0, 48);
     shore.receiveShadow = true;
     courseGroup.add(shore);
     const mat = new THREE.MeshStandardMaterial({ color: 0x2f9fd8, roughness: 0.25, metalness: 0.3 });
 
-    const lift = w.island ? 1.2 : 1.6 + (wi % 5) * 0.18;
+    const lift = w.island ? 1.2 : 3.2 + (wi % 5) * 0.18;
     const m = drapeDisc(h, w.x, w.y, w.r, lift, mat, 0, w.island ? 72 : 48);
     m.receiveShadow = false;
     waterMats.push(mat); courseGroup.add(m);
