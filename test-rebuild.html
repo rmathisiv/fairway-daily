@@ -1885,7 +1885,7 @@ function frame(now) {
     G.cam.y = lerp(G.cam.y, ty, 1 - Math.exp(-6 * dt));
 
     const onGreen = terrainAt(G.hole, G.ball.x, G.ball.y) === "green";
-    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 820); camPitch = 0.52; camLookTarget = 40; }
+    if (onGreen && !G.wasOnGreen && G.state === "aim") { camDist = Math.min(camDist, 500); camPitch = 0.52; camLookTarget = 40; }
     if (G.state === "aim") G.wasOnGreen = onGreen;
 
     for (let i = G.particles.length - 1; i >= 0; i--) {
